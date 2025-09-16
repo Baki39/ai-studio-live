@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface GeneratedAvatar {
   id: string;
@@ -60,7 +61,6 @@ export default function CreateAvatar() {
   const [generatedScript, setGeneratedScript] = useState("");
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [isEditingScript, setIsEditingScript] = useState(false);
-  const [openaiApiKey, setOpenaiApiKey] = useState("");
   
   // Voice generation states
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState("");
@@ -89,69 +89,34 @@ export default function CreateAvatar() {
       return;
     }
 
-    if (!openaiApiKey.trim()) {
-      toast.error("Molimo unesite OpenAI API ključ");
-      return;
-    }
-
     setIsGeneratingScript(true);
     toast.success("Generiranje AI scripta u toku...");
 
     try {
-      const prompt = `Kreiraj profesionalni podcast script za ${scriptAvatarCount} avatar(a) na osnovu sljedećeg koncepta:
-
-Koncept: ${concept}
-
-${links.filter(link => link.trim()).length > 0 ? `Dodatni resursi i linkovi:\n${links.filter(link => link.trim()).map(link => `- ${link}`).join('\n')}` : ''}
-
-Zahtjevi:
-- Script treba biti za ${scriptAvatarCount} avatar(a)
-- ${scriptAvatarCount === "1" ? "Format monologa" : "Format dijaloga između avatara"}
-- Jasno označi ko govori (Avatar 1, Avatar 2, itd.)
-- Profesionalan, ali pristupačan ton
-- Dužina: 5-10 minuta govora
-- Uključi prirodne tranzicije i interakcije
-
-Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
-
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [
-            {
-              role: 'system',
-              content: 'Ti si profesionalni podcast script writer. Kreiraj engaging i prirodne scriptove za podcast avatare.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 2000,
-          temperature: 0.7,
-        }),
+      const { data, error } = await supabase.functions.invoke('generate-script', {
+        body: {
+          concept,
+          links: links.filter(link => link.trim()),
+          scriptAvatarCount
+        }
       });
 
-      if (!response.ok) {
-        throw new Error('Greška pri generiranju scripta');
+      if (error) {
+        throw new Error(error.message || 'Greška pri generiranju scripta');
       }
 
-      const data = await response.json();
-      const script = data.choices[0].message.content;
-      
-      setGeneratedScript(script);
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      setGeneratedScript(data.script);
       setIsGeneratingScript(false);
       toast.success("Script uspješno generiran!");
       
     } catch (error) {
       console.error('Greška:', error);
       setIsGeneratingScript(false);
-      toast.error("Greška pri generiranju scripta. Molimo provjerite API ključ.");
+      toast.error(error.message || "Greška pri generiranju scripta");
     }
   };
 
@@ -360,31 +325,6 @@ Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Input Section */}
           <div className="space-y-6">
-            {/* OpenAI API Key */}
-            <GlassCard variant="accent">
-              <GlassCardHeader>
-                <GlassCardTitle className="flex items-center gap-2">
-                  <Key className="w-6 h-6 text-yellow-500" />
-                  OpenAI API Ključ
-                </GlassCardTitle>
-              </GlassCardHeader>
-              <GlassCardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="apikey">API Ključ (potreban za script generiranje)</Label>
-                  <Input
-                    id="apikey"
-                    type="password"
-                    placeholder="sk-..."
-                    value={openaiApiKey}
-                    onChange={(e) => setOpenaiApiKey(e.target.value)}
-                    className="glass border-glass-border"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Vaš API ključ se koristi samo lokalno i neće biti spremljen.
-                  </p>
-                </div>
-              </GlassCardContent>
-            </GlassCard>
             <GlassCard variant="primary">
               <GlassCardHeader>
                 <GlassCardTitle className="flex items-center gap-2">
@@ -467,7 +407,7 @@ Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
                 <div className="flex gap-2">
                   <Button
                     onClick={generateScript}
-                    disabled={isGeneratingScript || !openaiApiKey.trim()}
+                    disabled={isGeneratingScript}
                     className="flex-1 glass-button"
                   >
                     {isGeneratingScript ? (
