@@ -38,6 +38,17 @@ export default function CreateAvatar() {
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [isEditingScript, setIsEditingScript] = useState(false);
   const [openaiApiKey, setOpenaiApiKey] = useState("");
+  
+  // Voice generation states
+  const [elevenLabsApiKey, setElevenLabsApiKey] = useState("");
+  const [avatarVoices, setAvatarVoices] = useState<Array<{
+    voiceId: string;
+    model: string;
+    customVoiceId?: string;
+  }>>([]);
+  const [generatedVoices, setGeneratedVoices] = useState<Array<string | null>>([]);
+  const [isGeneratingVoices, setIsGeneratingVoices] = useState<Array<boolean>>([]);
+  const [isGeneratingAllVoices, setIsGeneratingAllVoices] = useState(false);
 
   const addLink = () => {
     setLinks([...links, ""]);
@@ -124,6 +135,145 @@ Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
   const regenerateScript = () => {
     setGeneratedScript("");
     generateScript();
+  };
+
+  // Voice generation functions
+  const updateAvatarVoice = (index: number, field: string, value: string) => {
+    const newVoices = [...avatarVoices];
+    if (!newVoices[index]) {
+      newVoices[index] = { voiceId: "", model: "eleven_multilingual_v2" };
+    }
+    newVoices[index] = { ...newVoices[index], [field]: value };
+    setAvatarVoices(newVoices);
+  };
+
+  const extractAvatarText = (script: string, avatarIndex: number): string => {
+    const lines = script.split('\n');
+    const avatarPattern = new RegExp(`Avatar ${avatarIndex + 1}:`, 'i');
+    const result: string[] = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (avatarPattern.test(line)) {
+        // Extract text after "Avatar X:"
+        const text = line.replace(avatarPattern, '').trim();
+        if (text) result.push(text);
+        
+        // Continue reading until next avatar or end
+        let j = i + 1;
+        while (j < lines.length && !lines[j].match(/Avatar \d+:/i)) {
+          const nextLine = lines[j].trim();
+          if (nextLine) result.push(nextLine);
+          j++;
+        }
+      }
+    }
+    
+    return result.join(' ').trim();
+  };
+
+  const generateVoiceForAvatar = async (avatarIndex: number) => {
+    if (!elevenLabsApiKey.trim()) {
+      toast.error("Molimo unesite ElevenLabs API ključ");
+      return;
+    }
+
+    const voiceConfig = avatarVoices[avatarIndex];
+    if (!voiceConfig?.voiceId) {
+      toast.error("Molimo izaberite voice za avatar");
+      return;
+    }
+
+    const voiceId = voiceConfig.voiceId === "custom" ? voiceConfig.customVoiceId : voiceConfig.voiceId;
+    if (!voiceId) {
+      toast.error("Molimo unesite voice ID");
+      return;
+    }
+
+    const newIsGenerating = [...isGeneratingVoices];
+    newIsGenerating[avatarIndex] = true;
+    setIsGeneratingVoices(newIsGenerating);
+
+    try {
+      const avatarText = extractAvatarText(generatedScript, avatarIndex);
+      if (!avatarText) {
+        toast.error(`Nema teksta za Avatar ${avatarIndex + 1}`);
+        return;
+      }
+
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': elevenLabsApiKey,
+        },
+        body: JSON.stringify({
+          text: avatarText,
+          model_id: voiceConfig.model,
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.5,
+            style: 0.5,
+            use_speaker_boost: true
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Greška pri generiranju voice-a');
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const newGeneratedVoices = [...generatedVoices];
+      newGeneratedVoices[avatarIndex] = audioUrl;
+      setGeneratedVoices(newGeneratedVoices);
+      
+      toast.success(`Voice za Avatar ${avatarIndex + 1} uspješno generiran!`);
+      
+    } catch (error) {
+      console.error('Greška:', error);
+      toast.error("Greška pri generiranju voice-a. Molimo provjerite API ključ.");
+    } finally {
+      const newIsGenerating = [...isGeneratingVoices];
+      newIsGenerating[avatarIndex] = false;
+      setIsGeneratingVoices(newIsGenerating);
+    }
+  };
+
+  const playGeneratedVoice = (avatarIndex: number) => {
+    const audioUrl = generatedVoices[avatarIndex];
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audio.play().catch(() => {
+        toast.error("Greška pri reprodukciji audio fajla");
+      });
+    }
+  };
+
+  const generateAllVoices = async () => {
+    if (!elevenLabsApiKey.trim()) {
+      toast.error("Molimo unesite ElevenLabs API ključ");
+      return;
+    }
+
+    const avatarCount = parseInt(scriptAvatarCount);
+    setIsGeneratingAllVoices(true);
+    
+    try {
+      for (let i = 0; i < avatarCount; i++) {
+        if (!generatedVoices[i]) {
+          await generateVoiceForAvatar(i);
+        }
+      }
+      toast.success("Svi glasovi uspješno generirani!");
+    } catch (error) {
+      toast.error("Greška pri generiranju glasova");
+    } finally {
+      setIsGeneratingAllVoices(false);
+    }
   };
 
   const generateAvatars = async () => {
@@ -310,18 +460,175 @@ Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
               </GlassCardContent>
             </GlassCard>
 
+            {/* AI Voice Podcast Generation */}
+            {generatedScript && (
+              <GlassCard variant="accent">
+                <GlassCardHeader>
+                  <GlassCardTitle className="flex items-center gap-2">
+                    <Mic className="w-6 h-6 text-accent" />
+                    AI Voice Podcast
+                  </GlassCardTitle>
+                </GlassCardHeader>
+                <GlassCardContent className="space-y-4">
+                  <div>
+                    <Label>ElevenLabs API Ključ</Label>
+                    <Input
+                      type="password"
+                      placeholder="xi_..."
+                      value={elevenLabsApiKey}
+                      onChange={(e) => setElevenLabsApiKey(e.target.value)}
+                      className="glass border-glass-border"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Potreban za generiranje glasova i kloniranje
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label>Voice konfiguracija za svaki avatar</Label>
+                    {Array.from({ length: parseInt(scriptAvatarCount) }, (_, index) => (
+                      <div key={index} className="glass p-4 rounded-lg space-y-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <User className="w-4 h-4" />
+                          <span className="font-medium">Avatar {index + 1}</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-sm">Voice ID</Label>
+                            <Select 
+                              value={avatarVoices[index]?.voiceId || ""} 
+                              onValueChange={(value) => updateAvatarVoice(index, 'voiceId', value)}
+                            >
+                              <SelectTrigger className="glass border-glass-border">
+                                <SelectValue placeholder="Izaberi voice" />
+                              </SelectTrigger>
+                              <SelectContent className="glass border-glass-border">
+                                <SelectItem value="9BWtsMINqrJLrRacOk9x">Aria (Ženski)</SelectItem>
+                                <SelectItem value="CwhRBWXzGAHq8TQ4Fs17">Roger (Muški)</SelectItem>
+                                <SelectItem value="EXAVITQu4vr4xnSDxMaL">Sarah (Ženski)</SelectItem>
+                                <SelectItem value="FGY2WhTYpPnrIDTdsKH5">Laura (Ženski)</SelectItem>
+                                <SelectItem value="TX3LPaxmHKxFdv7VOQHJ">Liam (Muški)</SelectItem>
+                                <SelectItem value="XB0fDUnXU5powFXDhCwa">Charlotte (Ženski)</SelectItem>
+                                <SelectItem value="custom">Vlastiti Voice ID</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <Label className="text-sm">Model</Label>
+                            <Select 
+                              value={avatarVoices[index]?.model || "eleven_multilingual_v2"} 
+                              onValueChange={(value) => updateAvatarVoice(index, 'model', value)}
+                            >
+                              <SelectTrigger className="glass border-glass-border">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="glass border-glass-border">
+                                <SelectItem value="eleven_multilingual_v2">Multilingual v2</SelectItem>
+                                <SelectItem value="eleven_turbo_v2_5">Turbo v2.5</SelectItem>
+                                <SelectItem value="eleven_turbo_v2">Turbo v2</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {avatarVoices[index]?.voiceId === "custom" && (
+                          <div>
+                            <Label className="text-sm">Vlastiti Voice ID</Label>
+                            <Input
+                              placeholder="Unesite ElevenLabs Voice ID"
+                              value={avatarVoices[index]?.customVoiceId || ""}
+                              onChange={(e) => updateAvatarVoice(index, 'customVoiceId', e.target.value)}
+                              className="glass border-glass-border"
+                            />
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => generateVoiceForAvatar(index)}
+                            disabled={isGeneratingVoices[index] || !elevenLabsApiKey.trim()}
+                            size="sm"
+                            className="flex-1 glass-button"
+                          >
+                            {isGeneratingVoices[index] ? (
+                              <>
+                                <Sparkles className="w-4 h-4 mr-2 animate-spin" />
+                                Generiranje...
+                              </>
+                            ) : (
+                              <>
+                                <Mic className="w-4 h-4 mr-2" />
+                                Generiraj Voice
+                              </>
+                            )}
+                          </Button>
+                          
+                          {generatedVoices[index] && (
+                            <Button
+                              onClick={() => playGeneratedVoice(index)}
+                              size="sm"
+                              variant="outline"
+                              className="glass-button"
+                            >
+                              <Video className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        {generatedVoices[index] && (
+                          <div className="mt-2 p-2 glass rounded border border-green-500/20">
+                            <p className="text-sm text-green-400 flex items-center gap-2">
+                              <Sparkles className="w-4 h-4" />
+                              Voice uspješno generiran - spreman za avatar generiranje
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={generateAllVoices}
+                      disabled={!elevenLabsApiKey.trim() || isGeneratingAllVoices}
+                      className="flex-1 glass-button cyber-gradient text-white font-semibold"
+                    >
+                      {isGeneratingAllVoices ? (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2 animate-spin" />
+                          Generiranje svih glasova...
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-4 h-4 mr-2" />
+                          Generiraj Sve Glasove
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </GlassCardContent>
+              </GlassCard>
+            )}
+
             <GlassCard>
               <GlassCardHeader>
                 <GlassCardTitle className="flex items-center gap-2">
                   <Sparkles className="w-6 h-6 text-accent" />
                   Avatar Generiranje
+                  {generatedVoices.some(voice => voice !== null) && (
+                    <Badge variant="secondary" className="ml-auto">
+                      Voice Ready
+                    </Badge>
+                  )}
                 </GlassCardTitle>
               </GlassCardHeader>
               <GlassCardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Broj avatara</Label>
-                    <Select defaultValue="2">
+                    <Select value={scriptAvatarCount} onValueChange={setScriptAvatarCount}>
                       <SelectTrigger className="glass border-glass-border">
                         <SelectValue />
                       </SelectTrigger>
@@ -329,6 +636,7 @@ Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
                         <SelectItem value="1">1 Avatar</SelectItem>
                         <SelectItem value="2">2 Avatara</SelectItem>
                         <SelectItem value="3">3 Avatara</SelectItem>
+                        <SelectItem value="4">4 Avatara</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -347,6 +655,24 @@ Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
                   </div>
                 </div>
 
+                {generatedVoices.some(voice => voice !== null) && (
+                  <div className="glass p-3 rounded-lg border border-green-500/20">
+                    <p className="text-sm text-green-400 mb-2 flex items-center gap-2">
+                      <Mic className="w-4 h-4" />
+                      Generirani glasovi će biti automatski dodani avatarima
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {generatedVoices.map((voice, index) => (
+                        voice && (
+                          <Badge key={index} variant="outline" className="text-green-400 border-green-500/20">
+                            Avatar {index + 1}: Voice Ready
+                          </Badge>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <Button
                   onClick={generateAvatars}
                   disabled={isGenerating}
@@ -361,6 +687,7 @@ Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
                     <>
                       <Brain className="w-4 h-4 mr-2" />
                       Generiraj AI Avatare
+                      {generatedVoices.some(voice => voice !== null) && " + Voice"}
                     </>
                   )}
                 </Button>
