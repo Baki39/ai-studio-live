@@ -18,7 +18,11 @@ import {
   Image, 
   Sparkles,
   Brain,
-  Download
+  Download,
+  FileText,
+  Edit3,
+  RefreshCw,
+  Key
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,6 +31,13 @@ export default function CreateAvatar() {
   const [links, setLinks] = useState<string[]>([""]);
   const [avatars, setAvatars] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Script generation states
+  const [scriptAvatarCount, setScriptAvatarCount] = useState("2");
+  const [generatedScript, setGeneratedScript] = useState("");
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [isEditingScript, setIsEditingScript] = useState(false);
+  const [openaiApiKey, setOpenaiApiKey] = useState("");
 
   const addLink = () => {
     setLinks([...links, ""]);
@@ -36,6 +47,83 @@ export default function CreateAvatar() {
     const newLinks = [...links];
     newLinks[index] = value;
     setLinks(newLinks);
+  };
+
+  const generateScript = async () => {
+    if (!concept.trim()) {
+      toast.error("Molimo unesite koncept podcasta");
+      return;
+    }
+
+    if (!openaiApiKey.trim()) {
+      toast.error("Molimo unesite OpenAI API ključ");
+      return;
+    }
+
+    setIsGeneratingScript(true);
+    toast.success("Generiranje AI scripta u toku...");
+
+    try {
+      const prompt = `Kreiraj profesionalni podcast script za ${scriptAvatarCount} avatar(a) na osnovu sljedećeg koncepta:
+
+Koncept: ${concept}
+
+${links.filter(link => link.trim()).length > 0 ? `Dodatni resursi i linkovi:\n${links.filter(link => link.trim()).map(link => `- ${link}`).join('\n')}` : ''}
+
+Zahtjevi:
+- Script treba biti za ${scriptAvatarCount} avatar(a)
+- ${scriptAvatarCount === "1" ? "Format monologa" : "Format dijaloga između avatara"}
+- Jasno označi ko govori (Avatar 1, Avatar 2, itd.)
+- Profesionalan, ali pristupačan ton
+- Dužina: 5-10 minuta govora
+- Uključi prirodne tranzicije i interakcije
+
+Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            {
+              role: 'system',
+              content: 'Ti si profesionalni podcast script writer. Kreiraj engaging i prirodne scriptove za podcast avatare.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 2000,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Greška pri generiranju scripta');
+      }
+
+      const data = await response.json();
+      const script = data.choices[0].message.content;
+      
+      setGeneratedScript(script);
+      setIsGeneratingScript(false);
+      toast.success("Script uspješno generiran!");
+      
+    } catch (error) {
+      console.error('Greška:', error);
+      setIsGeneratingScript(false);
+      toast.error("Greška pri generiranju scripta. Molimo provjerite API ključ.");
+    }
+  };
+
+  const regenerateScript = () => {
+    setGeneratedScript("");
+    generateScript();
   };
 
   const generateAvatars = async () => {
@@ -85,6 +173,31 @@ export default function CreateAvatar() {
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Input Section */}
           <div className="space-y-6">
+            {/* OpenAI API Key */}
+            <GlassCard variant="accent">
+              <GlassCardHeader>
+                <GlassCardTitle className="flex items-center gap-2">
+                  <Key className="w-6 h-6 text-yellow-500" />
+                  OpenAI API Ključ
+                </GlassCardTitle>
+              </GlassCardHeader>
+              <GlassCardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="apikey">API Ključ (potreban za script generiranje)</Label>
+                  <Input
+                    id="apikey"
+                    type="password"
+                    placeholder="sk-..."
+                    value={openaiApiKey}
+                    onChange={(e) => setOpenaiApiKey(e.target.value)}
+                    className="glass border-glass-border"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Vaš API ključ se koristi samo lokalno i neće biti spremljen.
+                  </p>
+                </div>
+              </GlassCardContent>
+            </GlassCard>
             <GlassCard variant="primary">
               <GlassCardHeader>
                 <GlassCardTitle className="flex items-center gap-2">
@@ -140,11 +253,68 @@ export default function CreateAvatar() {
               </GlassCardContent>
             </GlassCard>
 
+            {/* Script Generation */}
+            <GlassCard variant="secondary">
+              <GlassCardHeader>
+                <GlassCardTitle className="flex items-center gap-2">
+                  <FileText className="w-6 h-6 text-secondary" />
+                  AI Script Generiranje
+                </GlassCardTitle>
+              </GlassCardHeader>
+              <GlassCardContent className="space-y-4">
+                <div>
+                  <Label>Broj avatara za script</Label>
+                  <Select value={scriptAvatarCount} onValueChange={setScriptAvatarCount}>
+                    <SelectTrigger className="glass border-glass-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="glass border-glass-border">
+                      <SelectItem value="1">1 Avatar (Monolog)</SelectItem>
+                      <SelectItem value="2">2 Avatara (Dijalog)</SelectItem>
+                      <SelectItem value="3">3 Avatara (Grupa)</SelectItem>
+                      <SelectItem value="4">4 Avatara (Panel)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={generateScript}
+                    disabled={isGeneratingScript || !openaiApiKey.trim()}
+                    className="flex-1 glass-button"
+                  >
+                    {isGeneratingScript ? (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2 animate-spin" />
+                        Generiranje...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Generiraj Script
+                      </>
+                    )}
+                  </Button>
+                  
+                  {generatedScript && (
+                    <Button
+                      onClick={regenerateScript}
+                      disabled={isGeneratingScript}
+                      variant="outline"
+                      className="glass-button"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </GlassCardContent>
+            </GlassCard>
+
             <GlassCard>
               <GlassCardHeader>
                 <GlassCardTitle className="flex items-center gap-2">
                   <Sparkles className="w-6 h-6 text-accent" />
-                  Postavke generiranja
+                  Avatar Generiranje
                 </GlassCardTitle>
               </GlassCardHeader>
               <GlassCardContent className="space-y-4">
@@ -200,7 +370,103 @@ export default function CreateAvatar() {
 
           {/* Output Section */}
           <div className="space-y-6">
+            {/* Generated Script */}
             <GlassCard variant="glow">
+              <GlassCardHeader>
+                <GlassCardTitle className="flex items-center gap-2">
+                  <FileText className="w-6 h-6 text-primary" />
+                  Generirani Script
+                  {generatedScript && (
+                    <Button
+                      onClick={() => setIsEditingScript(!isEditingScript)}
+                      size="sm"
+                      variant="ghost"
+                      className="ml-auto"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </GlassCardTitle>
+              </GlassCardHeader>
+              <GlassCardContent>
+                {!generatedScript ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                    <p>Script će se pojaviti ovdje nakon generiranja</p>
+                    <p className="text-sm mt-2">Unesite OpenAI API ključ i generirajte script</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {isEditingScript ? (
+                      <div className="space-y-3">
+                        <Textarea
+                          value={generatedScript}
+                          onChange={(e) => setGeneratedScript(e.target.value)}
+                          className="min-h-96 glass border-glass-border font-mono text-sm"
+                          placeholder="Uređujte script ovdje..."
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => setIsEditingScript(false)}
+                            className="glass-button"
+                          >
+                            Spremi izmjene
+                          </Button>
+                          <Button
+                            onClick={() => setIsEditingScript(false)}
+                            variant="outline"
+                            className="glass-button"
+                          >
+                            Otkaži
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="glass p-4 rounded-lg">
+                        <div className="whitespace-pre-wrap font-mono text-sm">
+                          {generatedScript}
+                        </div>
+                        <div className="flex gap-2 mt-4 pt-4 border-t border-glass-border">
+                          <Button
+                            onClick={() => setIsEditingScript(true)}
+                            size="sm"
+                            variant="outline"
+                            className="glass-button"
+                          >
+                            <Edit3 className="w-4 h-4 mr-2" />
+                            Uredi
+                          </Button>
+                          <Button
+                            onClick={regenerateScript}
+                            size="sm"
+                            variant="outline"
+                            className="glass-button"
+                            disabled={isGeneratingScript}
+                          >
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Regeneriraj
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              navigator.clipboard.writeText(generatedScript);
+                              toast.success("Script kopiran u clipboard!");
+                            }}
+                            size="sm"
+                            variant="outline"
+                            className="glass-button ml-auto"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Kopiraj
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </GlassCardContent>
+            </GlassCard>
+
+            <GlassCard variant="secondary">
               <GlassCardHeader>
                 <GlassCardTitle className="flex items-center gap-2">
                   <Users className="w-6 h-6 text-secondary" />
