@@ -22,15 +22,38 @@ import {
   FileText,
   Edit3,
   RefreshCw,
-  Key
+  Key,
+  User2,
+  UserCheck,
+  Play,
+  Pause,
+  Volume2
 } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
+
+interface GeneratedAvatar {
+  id: string;
+  name: string;
+  gender: 'male' | 'female';
+  voice: string;
+  image: string | null;
+  video: string | null;
+  audio: Blob | null;
+  description?: string;
+}
 
 export default function CreateAvatar() {
   const [concept, setConcept] = useState("");
   const [links, setLinks] = useState<string[]>([""]);
-  const [avatars, setAvatars] = useState<any[]>([]);
+  const [avatars, setAvatars] = useState<GeneratedAvatar[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Avatar customization states
+  const [avatarDescription, setAvatarDescription] = useState('');
+  const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('male');
+  const [avatarImage, setAvatarImage] = useState<File | null>(null);
+  const [avatarImagePreview, setAvatarImagePreview] = useState<string | null>(null);
   
   // Script generation states
   const [scriptAvatarCount, setScriptAvatarCount] = useState("2");
@@ -276,36 +299,50 @@ Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
     }
   };
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setAvatarImage(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setAvatarImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const generateAvatars = async () => {
-    if (!concept.trim()) {
-      toast.error("Molimo unesite koncept podcasta");
+    if (!elevenLabsApiKey) {
+      toast.error("Molimo unesite ElevenLabs API ključ");
       return;
     }
 
     setIsGenerating(true);
-    toast.success("Generiranje AI avatara u toku...");
-    
-    // Simulacija generiranja
-    setTimeout(() => {
-      setAvatars([
-        {
-          id: 1,
-          name: "Marko",
-          gender: "male",
-          voice: "profesionalni",
-          avatar: "generated-male-avatar",
-        },
-        {
-          id: 2,
-          name: "Ana",
-          gender: "female", 
-          voice: "prijateljski",
-          avatar: "generated-female-avatar",
-        }
-      ]);
+    try {
+      const newAvatars: GeneratedAvatar[] = [];
+      
+      for (let i = 0; i < parseInt(scriptAvatarCount); i++) {
+        const avatar: GeneratedAvatar = {
+          id: `avatar-${i + 1}`,
+          name: `Avatar ${i + 1}`,
+          gender: i % 2 === 0 ? selectedGender : (selectedGender === 'male' ? 'female' : 'male'),
+          voice: avatarVoices[i]?.voiceId || 'default',
+          image: avatarImagePreview,
+          video: null,
+          audio: null,
+          description: avatarDescription || `Profesionalni ${i % 2 === 0 ? selectedGender === 'male' ? 'muški' : 'ženski' : selectedGender === 'male' ? 'ženski' : 'muški'} avatar za podcast`
+        };
+        newAvatars.push(avatar);
+      }
+      
+      setAvatars(newAvatars);
+      toast.success(`Uspješno generirani ${scriptAvatarCount} avatar(i)!`);
+    } catch (error) {
+      console.error('Error generating avatars:', error);
+      toast.error("Greška pri generiranju avatara");
+    } finally {
       setIsGenerating(false);
-      toast.success("AI avatari uspješno generirani!");
-    }, 3000);
+    }
   };
 
   return (
@@ -612,85 +649,135 @@ Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
               </GlassCard>
             )}
 
-            <GlassCard>
+            {/* Avatar Customization */}
+            <GlassCard variant="accent">
               <GlassCardHeader>
                 <GlassCardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-6 h-6 text-accent" />
-                  Avatar Generiranje
-                  {generatedVoices.some(voice => voice !== null) && (
-                    <Badge variant="secondary" className="ml-auto">
-                      Voice Ready
-                    </Badge>
-                  )}
+                  <UserCheck className="w-6 h-6 text-accent" />
+                  Prilagođavanje Avatara
                 </GlassCardTitle>
               </GlassCardHeader>
-              <GlassCardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Broj avatara</Label>
-                    <Select value={scriptAvatarCount} onValueChange={setScriptAvatarCount}>
-                      <SelectTrigger className="glass border-glass-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="glass border-glass-border">
-                        <SelectItem value="1">1 Avatar</SelectItem>
-                        <SelectItem value="2">2 Avatara</SelectItem>
-                        <SelectItem value="3">3 Avatara</SelectItem>
-                        <SelectItem value="4">4 Avatara</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <GlassCardContent>
+                <div className="space-y-6">
+                  {/* Gender Selection */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Spol avatara</Label>
+                    <RadioGroup
+                      value={selectedGender}
+                      onValueChange={(value) => setSelectedGender(value as 'male' | 'female')}
+                      className="flex gap-6"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="male" id="male" />
+                        <Label htmlFor="male" className="flex items-center gap-2 cursor-pointer">
+                          <User2 className="w-4 h-4" />
+                          Muški
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="female" id="female" />
+                        <Label htmlFor="female" className="flex items-center gap-2 cursor-pointer">
+                          <Users className="w-4 h-4" />
+                          Ženski
+                        </Label>
+                      </div>
+                    </RadioGroup>
                   </div>
-                  <div>
-                    <Label>Stil razgovora</Label>
-                    <Select defaultValue="casual">
-                      <SelectTrigger className="glass border-glass-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="glass border-glass-border">
-                        <SelectItem value="casual">Casual</SelectItem>
-                        <SelectItem value="professional">Profesionalni</SelectItem>
-                        <SelectItem value="educational">Edukativni</SelectItem>
-                      </SelectContent>
-                    </Select>
+
+                  {/* Avatar Description */}
+                  <div className="space-y-3">
+                    <Label htmlFor="avatar-description" className="text-sm font-medium">
+                      Opis avatara
+                    </Label>
+                    <Textarea
+                      id="avatar-description"
+                      placeholder="Opišite kako avatar treba da izgleda (npr. 'Mlada poslovnica sa kratkom crnom kosom, profesionalno odjevena, prijatan osmijeh...')"
+                      value={avatarDescription}
+                      onChange={(e) => setAvatarDescription(e.target.value)}
+                      className="glass border-glass-border min-h-20"
+                    />
+                  </div>
+
+                  {/* Image Upload */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Referentna slika (opcionalno)</Label>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="glass border-glass-border"
+                        />
+                      </div>
+                      {avatarImagePreview && (
+                        <div className="w-16 h-16 rounded-lg overflow-hidden border border-glass-border">
+                          <img
+                            src={avatarImagePreview}
+                            alt="Avatar preview"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Uploadaj sliku koja će služiti kao referenca za izgled avatara
+                    </p>
                   </div>
                 </div>
+              </GlassCardContent>
+            </GlassCard>
 
-                {generatedVoices.some(voice => voice !== null) && (
-                  <div className="glass p-3 rounded-lg border border-green-500/20">
-                    <p className="text-sm text-green-400 mb-2 flex items-center gap-2">
-                      <Mic className="w-4 h-4" />
-                      Generirani glasovi će biti automatski dodani avatarima
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {generatedVoices.map((voice, index) => (
-                        voice && (
-                          <Badge key={index} variant="outline" className="text-green-400 border-green-500/20">
-                            Avatar {index + 1}: Voice Ready
-                          </Badge>
-                        )
-                      ))}
+            {/* Avatar Generation */}
+            <GlassCard variant="accent">
+              <GlassCardHeader>
+                <GlassCardTitle className="flex items-center gap-2">
+                  <Users className="w-6 h-6 text-accent" />
+                  Avatar Generiranje
+                </GlassCardTitle>
+              </GlassCardHeader>
+              <GlassCardContent>
+                <div className="space-y-4">
+                  <div className="glass p-4 rounded-lg">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span className="text-sm font-medium">Spremni za generiranje</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p>• Broj avatara: {scriptAvatarCount}</p>
+                      <p>• Generirani glasovi: {generatedVoices.filter(v => v).length}/{scriptAvatarCount}</p>
+                      <p>• Spol: {selectedGender === 'male' ? 'Muški' : 'Ženski'}</p>
+                      {avatarDescription && <p>• Opis: Definisan</p>}
+                      {avatarImage && <p>• Referentna slika: Uploadana</p>}
                     </div>
                   </div>
-                )}
-
-                <Button
-                  onClick={generateAvatars}
-                  disabled={isGenerating}
-                  className="w-full glass-button cyber-gradient text-white font-semibold py-3"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Sparkles className="w-4 h-4 mr-2 animate-spin" />
-                      Generiranje u toku...
-                    </>
-                  ) : (
-                    <>
-                      <Brain className="w-4 h-4 mr-2" />
-                      Generiraj AI Avatare
-                      {generatedVoices.some(voice => voice !== null) && " + Voice"}
-                    </>
+                  
+                  <Button
+                    onClick={generateAvatars}
+                    className="w-full glass-button"
+                    disabled={isGenerating || generatedVoices.filter(v => v).length === 0}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Generiranje realističnih avatara...
+                      </>
+                    ) : (
+                      <>
+                        <Users className="w-4 h-4 mr-2" />
+                        Generiraj realistične avatare
+                      </>
+                    )}
+                  </Button>
+                  
+                  {generatedVoices.filter(v => v).length === 0 && (
+                    <div className="glass p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                      <p className="text-sm text-amber-600 dark:text-amber-400 text-center">
+                        Prvo generirajte glasove u "AI Voice Podcast" sekciji
+                      </p>
+                    </div>
                   )}
-                </Button>
+                </div>
               </GlassCardContent>
             </GlassCard>
           </div>
@@ -811,20 +898,33 @@ Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
                     {avatars.map((avatar) => (
                       <div key={avatar.id} className="glass p-4 rounded-xl">
                         <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 rounded-full cyber-gradient-secondary flex items-center justify-center">
-                            <User className="w-8 h-8 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-lg">{avatar.name}</h3>
-                            <div className="flex gap-2 mt-2">
-                              <Badge variant={avatar.gender === 'male' ? 'default' : 'secondary'}>
-                                {avatar.gender === 'male' ? 'Muški' : 'Ženski'}
-                              </Badge>
-                              <Badge variant="outline">
-                                {avatar.voice}
-                              </Badge>
-                            </div>
-                          </div>
+                           <div className="w-16 h-16 rounded-full cyber-gradient-secondary flex items-center justify-center overflow-hidden">
+                             {avatar.image ? (
+                               <img 
+                                 src={avatar.image} 
+                                 alt={avatar.name}
+                                 className="w-full h-full object-cover"
+                               />
+                             ) : (
+                               <User className="w-8 h-8 text-white" />
+                             )}
+                           </div>
+                           <div className="flex-1">
+                             <h3 className="font-semibold text-lg">{avatar.name}</h3>
+                             {avatar.description && (
+                               <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                 {avatar.description}
+                               </p>
+                             )}
+                             <div className="flex gap-2 mt-2">
+                               <Badge variant={avatar.gender === 'male' ? 'default' : 'secondary'}>
+                                 {avatar.gender === 'male' ? 'Muški' : 'Ženski'}
+                               </Badge>
+                               <Badge variant="outline">
+                                 {avatar.voice}
+                               </Badge>
+                             </div>
+                           </div>
                         </div>
 
                         <Tabs defaultValue="audio" className="mt-4">
@@ -871,19 +971,29 @@ Odgovori samo sa scriptom, bez dodatnih objašnjenja.`;
                             </div>
                           </TabsContent>
                           
-                          <TabsContent value="image" className="mt-4">
-                            <div className="glass p-4 rounded-lg">
-                              <div className="w-full h-32 bg-gradient-to-tr from-accent/20 to-primary/20 rounded-lg flex items-center justify-center">
-                                <Image className="w-8 h-8 text-accent" />
-                              </div>
-                              <div className="flex justify-between items-center mt-2">
-                                <span className="text-sm text-muted-foreground">Avatar Image</span>
-                                <Button size="sm" variant="outline" className="glass-button">
-                                  <Download className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </TabsContent>
+                           <TabsContent value="image" className="mt-4">
+                             <div className="glass p-4 rounded-lg">
+                               <div className="w-full h-32 bg-gradient-to-tr from-accent/20 to-primary/20 rounded-lg flex items-center justify-center overflow-hidden">
+                                 {avatar.image ? (
+                                   <img 
+                                     src={avatar.image} 
+                                     alt={`${avatar.name} full image`}
+                                     className="w-full h-full object-cover rounded-lg"
+                                   />
+                                 ) : (
+                                   <Image className="w-8 h-8 text-accent" />
+                                 )}
+                               </div>
+                               <div className="flex justify-between items-center mt-2">
+                                 <span className="text-sm text-muted-foreground">
+                                   {avatar.image ? 'Realistični Avatar' : 'Avatar Image'}
+                                 </span>
+                                 <Button size="sm" variant="outline" className="glass-button">
+                                   <Download className="w-4 h-4" />
+                                 </Button>
+                               </div>
+                             </div>
+                           </TabsContent>
                         </Tabs>
                       </div>
                     ))}
