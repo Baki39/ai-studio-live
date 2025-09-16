@@ -822,6 +822,182 @@ export default function PodcastLive() {
                 </div>
               </GlassCardContent>
             </GlassCard>
+
+            {/* AI-Powered Real-time Features */}
+            <div className="mt-8 grid md:grid-cols-2 gap-6">
+              {/* Real-time AI Transcription & Analysis */}
+              <GlassCard variant="secondary">
+                <GlassCardHeader>
+                  <GlassCardTitle className="flex items-center gap-2">
+                    <ScanLine className="w-5 h-5 text-accent" />
+                    AI Transkripcija & Analiza
+                  </GlassCardTitle>
+                </GlassCardHeader>
+                <GlassCardContent>
+                  <div className="space-y-4">
+                    <div className="h-32 bg-background-secondary/50 rounded-lg p-3 overflow-y-auto border border-accent/20">
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-start gap-2">
+                          <Badge variant="outline" className="text-xs">Domaćin</Badge>
+                          <p className="flex-1">Dobrodošli na naš podcast...</p>
+                        </div>
+                        {avatarsActive && (
+                          <>
+                            <div className="flex items-start gap-2">
+                              <Badge variant="secondary" className="text-xs">Marko AI</Badge>
+                              <p className="flex-1">Zdravo svima! Hvala što ste se pridružili...</p>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <Badge variant="secondary" className="text-xs">Ana AI</Badge>
+                              <p className="flex-1">Pozdrav! Ovo je odličan sadržaj...</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="glass p-2 rounded-lg text-center">
+                        <div className="text-lg font-bold text-accent">3:42</div>
+                        <div className="text-xs text-muted-foreground">Vreme Razgovora</div>
+                      </div>
+                      <div className="glass p-2 rounded-lg text-center">
+                        <div className="text-lg font-bold text-primary">247</div>
+                        <div className="text-xs text-muted-foreground">Reči/Min</div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Button size="sm" variant="outline" className="w-full glass-button">
+                        <Download className="w-3 h-3 mr-1" />
+                        Izvoz Transkripcije
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="flex-1 glass-button">
+                          <Brain className="w-3 h-3 mr-1" />
+                          AI Rezime
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 glass-button">
+                          <Focus className="w-3 h-3 mr-1" />
+                          Ključne Teme
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </GlassCardContent>
+              </GlassCard>
+
+              {/* Advanced Broadcasting Controls */}
+              <GlassCard variant="accent">
+                <GlassCardHeader>
+                  <GlassCardTitle className="flex items-center gap-2">
+                    <Radio className="w-5 h-5 text-accent" />
+                    Napredni Broadcasting
+                  </GlassCardTitle>
+                </GlassCardHeader>
+                <GlassCardContent>
+                  <div className="space-y-4">
+                    {/* Live Streaming Platforms */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium">Live Stream Platforme</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['YouTube', 'Twitch', 'Facebook', 'LinkedIn'].map((platform) => (
+                          <div key={platform} className="flex items-center justify-between p-2 glass rounded-lg">
+                            <span className="text-xs">{platform}</span>
+                            <Switch />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Real-time Metrics */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium">Metrije u Realnom Vremenu</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="glass p-2 rounded-lg text-center">
+                          <div className="text-sm font-bold text-accent">1,247</div>
+                          <div className="text-xs text-muted-foreground">Gledaoci</div>
+                        </div>
+                        <div className="glass p-2 rounded-lg text-center">
+                          <div className="text-sm font-bold text-primary">89%</div>
+                          <div className="text-xs text-muted-foreground">Engagement</div>
+                        </div>
+                        <div className="glass p-2 rounded-lg text-center">
+                          <div className="text-sm font-bold text-green-500">4.8</div>
+                          <div className="text-xs text-muted-foreground">Rating</div>
+                        </div>
+                        <div className="glass p-2 rounded-lg text-center">
+                          <div className="text-sm font-bold text-blue-500">156</div>
+                          <div className="text-xs text-muted-foreground">Komentari</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* AI Suggestions */}
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">AI Predlozi</h4>
+                      <div className="glass p-3 rounded-lg border border-accent/20">
+                        <div className="flex items-start gap-2">
+                          <Sparkles className="w-4 h-4 text-accent mt-0.5" />
+                          <div className="text-xs">
+                            <p className="font-medium">Predlog teme:</p>
+                            <p className="text-muted-foreground">Razgovarajte o najnovijim trendovima u AI tehnologiji</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </GlassCardContent>
+              </GlassCard>
+            </div>
+
+            {/* Dynamic Scene Templates */}
+            <div className="mt-8">
+              <GlassCard variant="glow">
+                <GlassCardHeader>
+                  <GlassCardTitle className="flex items-center gap-2">
+                    <Monitor className="w-5 h-5 text-accent" />
+                    Dinamički Scene Templates
+                  </GlassCardTitle>
+                </GlassCardHeader>
+                <GlassCardContent>
+                  <div className="grid md:grid-cols-4 gap-4">
+                    {[
+                      { name: 'Interview Mode', icon: Users, active: currentSpeaker !== 'host' },
+                      { name: 'Presentation', icon: Monitor, active: false },
+                      { name: 'Panel Discussion', icon: Users, active: avatarsActive },
+                      { name: 'Q&A Session', icon: Activity, active: false }
+                    ].map((template) => (
+                      <Button
+                        key={template.name}
+                        variant={template.active ? "default" : "outline"}
+                        className={`h-20 flex-col gap-2 glass-button ${template.active ? 'cyber-gradient text-white' : ''}`}
+                      >
+                        <template.icon className="w-6 h-6" />
+                        <span className="text-xs">{template.name}</span>
+                      </Button>
+                    ))}
+                  </div>
+                  
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">
+                        <Cpu className="w-3 h-3 mr-1" />
+                        AI Auto-Scene
+                      </Badge>
+                      <Badge variant="secondary">
+                        <Eye className="w-3 h-3 mr-1" />
+                        Smart Focus
+                      </Badge>
+                    </div>
+                    <Button size="sm" variant="outline" className="glass-button">
+                      <Settings className="w-3 h-3 mr-1" />
+                      Prilagodi Scene
+                    </Button>
+                  </div>
+                </GlassCardContent>
+              </GlassCard>
+            </div>
           </div>
         )}
       </div>
