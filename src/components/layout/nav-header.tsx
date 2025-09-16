@@ -2,8 +2,11 @@ import { Globe, Mic, Video } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useNavigate } from "react-router-dom";
 
 export function NavHeader() {
+  const navigate = useNavigate();
+  
   const languages = [
     { code: "en", name: "English", flag: "🇺🇸" },
     { code: "bs", name: "Bosanski", flag: "🇧🇦" },
@@ -30,11 +33,11 @@ export function NavHeader() {
 
         {/* Navigation */}
         <nav className="hidden md:flex items-center space-x-1">
-          <Button variant="ghost" className="glass-hover">
+          <Button variant="ghost" className="glass-hover" onClick={() => navigate('/create-avatar')}>
             <Video className="w-4 h-4 mr-2" />
             Create Avatar
           </Button>
-          <Button variant="ghost" className="glass-hover">
+          <Button variant="ghost" className="glass-hover" onClick={() => navigate('/podcast-live')}>
             <Mic className="w-4 h-4 mr-2" />
             Podcast Live
           </Button>
