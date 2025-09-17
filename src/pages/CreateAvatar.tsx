@@ -207,14 +207,24 @@ export default function CreateAvatar() {
 
     // Helper: try to parse a speaker label from a line
     const parseSpeakerFromLine = (line: string): { label: string; content: string } | null => {
-      // Allow formats like: "Avatar 1:", "**Avatar 1:**", "Avatar 1 -", "AVATAR 2:", "Amir:", "Hana —"
-      const match = line.match(/^\s*(?:\*\*|__)?\s*([A-Za-zČĆŠĐŽčćšđž][\wČĆŠĐŽčćšđž'’\- ]{0,30}|Avatar\s*\d+)\s*[:\-–—)]\s*(.*)$/i);
-      if (!match) return null;
-      const label = match[1].trim();
-      const content = (match[2] || "").trim();
-      return { label, content };
-    };
+      // 1) Prefer explicit "Avatar N" labels (supports **bold**, (brackets), and optional punctuation or EOL)
+      const avatarMatch = line.match(/^\s*(?:\*\*|__)?\s*(?:[\[\(])?\s*(Avatar\s*\d+)\s*(?:[\]\)])?\s*(?::|[-–—])?\s*(.*)$/i);
+      if (avatarMatch) {
+        const label = avatarMatch[1].trim();
+        const content = (avatarMatch[2] || "").trim();
+        return { label, content };
+      }
 
+      // 2) Named speakers (Amir:, Hana— ...) require punctuation to avoid false positives
+      const nameMatch = line.match(/^\s*(?:\*\*|__)?\s*([A-Za-zČĆŠĐŽčćšđž][\wČĆŠĐŽčćšđž'’\- ]{0,30})\s*[:\-–—]\s*(.*)$/i);
+      if (nameMatch) {
+        const label = nameMatch[1].trim();
+        const content = (nameMatch[2] || "").trim();
+        return { label, content };
+      }
+
+      return null;
+    };
     type Block = { speaker: string; text: string[] };
     const blocks: Block[] = [];
     const speakersOrder: string[] = [];
