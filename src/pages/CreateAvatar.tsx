@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,7 +27,8 @@ import {
   UserCheck,
   Play,
   Pause,
-  Volume2
+  Volume2,
+  Square
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
@@ -44,12 +45,20 @@ interface GeneratedAvatar {
   description?: string;
 }
 
+interface AudioState {
+  [key: string]: {
+    isPlaying: boolean;
+    audio: HTMLAudioElement | null;
+  };
+}
+
 export default function CreateAvatar() {
   const [concept, setConcept] = useState("");
   const [links, setLinks] = useState<string[]>([""]);
   const [duration, setDuration] = useState("");
   const [avatars, setAvatars] = useState<GeneratedAvatar[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [audioStates, setAudioStates] = useState<AudioState>({});
   
   // Avatar customization states
   const [avatarDescription, setAvatarDescription] = useState('');
@@ -64,7 +73,6 @@ export default function CreateAvatar() {
   const [isEditingScript, setIsEditingScript] = useState(false);
   
   // Voice generation states
-  const [elevenLabsApiKey, setElevenLabsApiKey] = useState("");
   const [avatarVoices, setAvatarVoices] = useState<Array<{
     voiceId: string;
     model: string;
@@ -162,11 +170,6 @@ export default function CreateAvatar() {
   };
 
   const generateVoiceForAvatar = async (avatarIndex: number) => {
-    if (!elevenLabsApiKey.trim()) {
-      toast.error("Molimo unesite ElevenLabs API ključ");
-      return;
-    }
-
     const voiceConfig = avatarVoices[avatarIndex];
     if (!voiceConfig?.voiceId) {
       toast.error("Molimo izaberite voice za avatar");
@@ -190,30 +193,24 @@ export default function CreateAvatar() {
         return;
       }
 
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': elevenLabsApiKey,
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('generate-voice', {
+        body: {
           text: avatarText,
-          model_id: voiceConfig.model,
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.5,
-            style: 0.5,
-            use_speaker_boost: true
-          }
-        }),
+          voice_id: voiceId
+        },
       });
 
-      if (!response.ok) {
-        throw new Error('Greška pri generiranju voice-a');
+      if (error) throw error;
+
+      if (data.error) {
+        throw new Error(data.error);
       }
 
-      const audioBlob = await response.blob();
+      // Convert base64 to blob and create URL
+      const audioBlob = new Blob(
+        [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
+        { type: 'audio/mpeg' }
+      );
       const audioUrl = URL.createObjectURL(audioBlob);
       
       const newGeneratedVoices = [...generatedVoices];
@@ -224,7 +221,7 @@ export default function CreateAvatar() {
       
     } catch (error) {
       console.error('Greška:', error);
-      toast.error("Greška pri generiranju voice-a. Molimo provjerite API ključ.");
+      toast.error("Greška pri generiranju voice-a. Molimo provjerite konfiguraciju.");
     } finally {
       const newIsGenerating = [...isGeneratingVoices];
       newIsGenerating[avatarIndex] = false;
@@ -232,22 +229,76 @@ export default function CreateAvatar() {
     }
   };
 
-  const playGeneratedVoice = (avatarIndex: number) => {
+  const handlePlayPause = (avatarIndex: number) => {
     const audioUrl = generatedVoices[avatarIndex];
-    if (audioUrl) {
-      const audio = new Audio(audioUrl);
-      audio.play().catch(() => {
-        toast.error("Greška pri reprodukciji audio fajla");
-      });
+    if (!audioUrl) return;
+
+    const currentState = audioStates[`avatar-${avatarIndex}`];
+    
+    if (currentState?.isPlaying) {
+      // Pause
+      currentState.audio?.pause();
+      setAudioStates(prev => ({
+        ...prev,
+        [`avatar-${avatarIndex}`]: { ...prev[`avatar-${avatarIndex}`], isPlaying: false }
+      }));
+    } else {
+      // Play
+      if (currentState?.audio) {
+        currentState.audio.play();
+        setAudioStates(prev => ({
+          ...prev,
+          [`avatar-${avatarIndex}`]: { ...prev[`avatar-${avatarIndex}`], isPlaying: true }
+        }));
+      } else {
+        // Create new audio instance
+        const audio = new Audio(audioUrl);
+        audio.addEventListener('ended', () => {
+          setAudioStates(prev => ({
+            ...prev,
+            [`avatar-${avatarIndex}`]: { ...prev[`avatar-${avatarIndex}`], isPlaying: false }
+          }));
+        });
+        audio.play();
+        setAudioStates(prev => ({
+          ...prev,
+          [`avatar-${avatarIndex}`]: { audio, isPlaying: true }
+        }));
+      }
     }
   };
 
-  const generateAllVoices = async () => {
-    if (!elevenLabsApiKey.trim()) {
-      toast.error("Molimo unesite ElevenLabs API ključ");
-      return;
+  const handleStop = (avatarIndex: number) => {
+    const currentState = audioStates[`avatar-${avatarIndex}`];
+    if (currentState?.audio) {
+      currentState.audio.pause();
+      currentState.audio.currentTime = 0;
+      setAudioStates(prev => ({
+        ...prev,
+        [`avatar-${avatarIndex}`]: { ...prev[`avatar-${avatarIndex}`], isPlaying: false }
+      }));
     }
+  };
 
+  const handleDownload = (avatarIndex: number) => {
+    const audioUrl = generatedVoices[avatarIndex];
+    if (!audioUrl) return;
+    
+    const filename = `avatar_${avatarIndex + 1}_voice.mp3`;
+    
+    const link = document.createElement('a');
+    link.href = audioUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const playGeneratedVoice = (avatarIndex: number) => {
+    handlePlayPause(avatarIndex);
+  };
+
+  const generateAllVoices = async () => {
     const avatarCount = parseInt(scriptAvatarCount);
     setIsGeneratingAllVoices(true);
     
@@ -278,11 +329,6 @@ export default function CreateAvatar() {
   };
 
   const generateAvatars = async () => {
-    if (!elevenLabsApiKey) {
-      toast.error("Molimo unesite ElevenLabs API ključ");
-      return;
-    }
-
     setIsGenerating(true);
     try {
       const newAvatars: GeneratedAvatar[] = [];
@@ -464,20 +510,6 @@ export default function CreateAvatar() {
                   </GlassCardTitle>
                 </GlassCardHeader>
                 <GlassCardContent className="space-y-4">
-                  <div>
-                    <Label>ElevenLabs API Ključ</Label>
-                    <Input
-                      type="password"
-                      placeholder="xi_..."
-                      value={elevenLabsApiKey}
-                      onChange={(e) => setElevenLabsApiKey(e.target.value)}
-                      className="glass border-glass-border"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Potreban za generiranje glasova i kloniranje
-                    </p>
-                  </div>
-
                   <div className="space-y-3">
                     <Label>Voice konfiguracija za svaki avatar</Label>
                     {Array.from({ length: parseInt(scriptAvatarCount) }, (_, index) => (
@@ -487,24 +519,27 @@ export default function CreateAvatar() {
                           <span className="font-medium">Avatar {index + 1}</span>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
-                            <Label className="text-sm">Voice ID</Label>
+                            <Label className="text-sm">Voice</Label>
                             <Select 
                               value={avatarVoices[index]?.voiceId || ""} 
-                              onValueChange={(value) => updateAvatarVoice(index, 'voiceId', value)}
+                              onValueChange={(value) => updateAvatarVoice(index, "voiceId", value)}
                             >
                               <SelectTrigger className="glass border-glass-border">
-                                <SelectValue placeholder="Izaberi voice" />
+                                <SelectValue placeholder="Izaberite voice" />
                               </SelectTrigger>
                               <SelectContent className="glass border-glass-border">
-                                <SelectItem value="9BWtsMINqrJLrRacOk9x">Aria (Ženski)</SelectItem>
-                                <SelectItem value="CwhRBWXzGAHq8TQ4Fs17">Roger (Muški)</SelectItem>
-                                <SelectItem value="EXAVITQu4vr4xnSDxMaL">Sarah (Ženski)</SelectItem>
-                                <SelectItem value="FGY2WhTYpPnrIDTdsKH5">Laura (Ženski)</SelectItem>
-                                <SelectItem value="TX3LPaxmHKxFdv7VOQHJ">Liam (Muški)</SelectItem>
-                                <SelectItem value="XB0fDUnXU5powFXDhCwa">Charlotte (Ženski)</SelectItem>
-                                <SelectItem value="custom">Vlastiti Voice ID</SelectItem>
+                                <SelectItem value="21m00Tcm4TlvDq8ikWAM">Rachel</SelectItem>
+                                <SelectItem value="AZnzlk1XvdvUeBnXmlld">Domi</SelectItem>
+                                <SelectItem value="EXAVITQu4vr4xnSDxMaL">Bella</SelectItem>
+                                <SelectItem value="ErXwobaYiN019PkySvjV">Antoni</SelectItem>
+                                <SelectItem value="MF3mGyEYCl7XYWbV9V6O">Elli</SelectItem>
+                                <SelectItem value="TxGEqnHWrfWFTfGW9XjX">Josh</SelectItem>
+                                <SelectItem value="VR6AewLTigWG4xSOukaG">Arnold</SelectItem>
+                                <SelectItem value="pNInz6obpgDQGcFmaJgB">Adam</SelectItem>
+                                <SelectItem value="yoZ06aMxZJJ28mfd3POQ">Sam</SelectItem>
+                                <SelectItem value="custom">Custom Voice ID</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -513,7 +548,7 @@ export default function CreateAvatar() {
                             <Label className="text-sm">Model</Label>
                             <Select 
                               value={avatarVoices[index]?.model || "eleven_multilingual_v2"} 
-                              onValueChange={(value) => updateAvatarVoice(index, 'model', value)}
+                              onValueChange={(value) => updateAvatarVoice(index, "model", value)}
                             >
                               <SelectTrigger className="glass border-glass-border">
                                 <SelectValue />
@@ -522,442 +557,142 @@ export default function CreateAvatar() {
                                 <SelectItem value="eleven_multilingual_v2">Multilingual v2</SelectItem>
                                 <SelectItem value="eleven_turbo_v2_5">Turbo v2.5</SelectItem>
                                 <SelectItem value="eleven_turbo_v2">Turbo v2</SelectItem>
+                                <SelectItem value="eleven_monolingual_v1">English v1</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
-
+                        
                         {avatarVoices[index]?.voiceId === "custom" && (
                           <div>
-                            <Label className="text-sm">Vlastiti Voice ID</Label>
+                            <Label className="text-sm">Custom Voice ID</Label>
                             <Input
-                              placeholder="Unesite ElevenLabs Voice ID"
+                              placeholder="Unesite voice ID..."
                               value={avatarVoices[index]?.customVoiceId || ""}
-                              onChange={(e) => updateAvatarVoice(index, 'customVoiceId', e.target.value)}
+                              onChange={(e) => updateAvatarVoice(index, "customVoiceId", e.target.value)}
                               className="glass border-glass-border"
                             />
                           </div>
                         )}
-
-                        <div className="flex gap-2">
+                        
+                        <div className="flex items-center gap-2">
                           <Button
                             onClick={() => generateVoiceForAvatar(index)}
-                            disabled={isGeneratingVoices[index] || !elevenLabsApiKey.trim()}
+                            disabled={isGeneratingVoices[index]}
                             size="sm"
-                            className="flex-1 glass-button"
+                            className="glass-button"
                           >
                             {isGeneratingVoices[index] ? (
                               <>
-                                <Sparkles className="w-4 h-4 mr-2 animate-spin" />
+                                <Sparkles className="w-3 h-3 mr-1 animate-spin" />
                                 Generiranje...
                               </>
                             ) : (
                               <>
-                                <Mic className="w-4 h-4 mr-2" />
-                                Generiraj Voice
+                                <Mic className="w-3 h-3 mr-1" />
+                                Generiraj
                               </>
                             )}
                           </Button>
                           
                           {generatedVoices[index] && (
-                            <Button
-                              onClick={() => playGeneratedVoice(index)}
-                              size="sm"
-                              variant="outline"
-                              className="glass-button"
-                            >
-                              <Video className="w-4 h-4" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                onClick={() => handlePlayPause(index)}
+                                size="sm"
+                                variant="outline"
+                                className="glass-button"
+                              >
+                                {audioStates[`avatar-${index}`]?.isPlaying ? (
+                                  <Pause className="w-3 h-3" />
+                                ) : (
+                                  <Play className="w-3 h-3" />
+                                )}
+                              </Button>
+                              
+                              <Button
+                                onClick={() => handleStop(index)}
+                                size="sm"
+                                variant="outline"
+                                className="glass-button"
+                              >
+                                <Square className="w-3 h-3" />
+                              </Button>
+                              
+                              <Button
+                                onClick={() => handleDownload(index)}
+                                size="sm"
+                                variant="outline"
+                                className="glass-button"
+                              >
+                                <Download className="w-3 h-3" />
+                              </Button>
+                            </div>
                           )}
                         </div>
-
-                        {generatedVoices[index] && (
-                          <div className="mt-2 p-2 glass rounded border border-green-500/20">
-                            <p className="text-sm text-green-400 flex items-center gap-2">
-                              <Sparkles className="w-4 h-4" />
-                              Voice uspješno generiran - spreman za avatar generiranje
-                            </p>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
 
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={generateAllVoices}
-                      disabled={!elevenLabsApiKey.trim() || isGeneratingAllVoices}
-                      className="flex-1 glass-button cyber-gradient text-white font-semibold"
-                    >
-                      {isGeneratingAllVoices ? (
-                        <>
-                          <Sparkles className="w-4 h-4 mr-2 animate-spin" />
-                          Generiranje svih glasova...
-                        </>
-                      ) : (
-                        <>
-                          <Mic className="w-4 h-4 mr-2" />
-                          Generiraj Sve Glasove
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </GlassCardContent>
-              </GlassCard>
-            )}
-
-            {/* Avatar Customization */}
-            <GlassCard variant="accent">
-              <GlassCardHeader>
-                <GlassCardTitle className="flex items-center gap-2">
-                  <UserCheck className="w-6 h-6 text-accent" />
-                  Prilagođavanje Avatara
-                </GlassCardTitle>
-              </GlassCardHeader>
-              <GlassCardContent>
-                <div className="space-y-6">
-                  {/* Gender Selection */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Spol avatara</Label>
-                    <RadioGroup
-                      value={selectedGender}
-                      onValueChange={(value) => setSelectedGender(value as 'male' | 'female')}
-                      className="flex gap-6"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="male" id="male" />
-                        <Label htmlFor="male" className="flex items-center gap-2 cursor-pointer">
-                          <User2 className="w-4 h-4" />
-                          Muški
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="female" id="female" />
-                        <Label htmlFor="female" className="flex items-center gap-2 cursor-pointer">
-                          <Users className="w-4 h-4" />
-                          Ženski
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Avatar Description */}
-                  <div className="space-y-3">
-                    <Label htmlFor="avatar-description" className="text-sm font-medium">
-                      Opis avatara
-                    </Label>
-                    <Textarea
-                      id="avatar-description"
-                      placeholder="Opišite kako avatar treba da izgleda (npr. 'Mlada poslovnica sa kratkom crnom kosom, profesionalno odjevena, prijatan osmijeh...')"
-                      value={avatarDescription}
-                      onChange={(e) => setAvatarDescription(e.target.value)}
-                      className="glass border-glass-border min-h-20"
-                    />
-                  </div>
-
-                  {/* Image Upload */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Referentna slika (opcionalno)</Label>
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1">
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          className="glass border-glass-border"
-                        />
-                      </div>
-                      {avatarImagePreview && (
-                        <div className="w-16 h-16 rounded-lg overflow-hidden border border-glass-border">
-                          <img
-                            src={avatarImagePreview}
-                            alt="Avatar preview"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Uploadaj sliku koja će služiti kao referenca za izgled avatara
-                    </p>
-                  </div>
-                </div>
-              </GlassCardContent>
-            </GlassCard>
-
-            {/* Avatar Generation */}
-            <GlassCard variant="accent">
-              <GlassCardHeader>
-                <GlassCardTitle className="flex items-center gap-2">
-                  <Users className="w-6 h-6 text-accent" />
-                  Avatar Generiranje
-                </GlassCardTitle>
-              </GlassCardHeader>
-              <GlassCardContent>
-                <div className="space-y-4">
-                  <div className="glass p-4 rounded-lg">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <span className="text-sm font-medium">Spremni za generiranje</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <p>• Broj avatara: {scriptAvatarCount}</p>
-                      <p>• Generirani glasovi: {generatedVoices.filter(v => v).length}/{scriptAvatarCount}</p>
-                      <p>• Spol: {selectedGender === 'male' ? 'Muški' : 'Ženski'}</p>
-                      {avatarDescription && <p>• Opis: Definisan</p>}
-                      {avatarImage && <p>• Referentna slika: Uploadana</p>}
-                    </div>
-                  </div>
-                  
                   <Button
-                    onClick={generateAvatars}
+                    onClick={generateAllVoices}
+                    disabled={isGeneratingAllVoices}
                     className="w-full glass-button"
-                    disabled={isGenerating || generatedVoices.filter(v => v).length === 0}
                   >
-                    {isGenerating ? (
+                    {isGeneratingAllVoices ? (
                       <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Generiranje realističnih avatara...
+                        <Sparkles className="w-4 h-4 mr-2 animate-spin" />
+                        Generiranje svih glasova...
                       </>
                     ) : (
                       <>
-                        <Users className="w-4 h-4 mr-2" />
-                        Generiraj realistične avatare
+                        <Volume2 className="w-4 h-4 mr-2" />
+                        Generiraj sve glasove
                       </>
                     )}
                   </Button>
-                  
-                  {generatedVoices.filter(v => v).length === 0 && (
-                    <div className="glass p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
-                      <p className="text-sm text-amber-600 dark:text-amber-400 text-center">
-                        Prvo generirajte glasove u "AI Voice Podcast" sekciji
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </GlassCardContent>
-            </GlassCard>
+                </GlassCardContent>
+              </GlassCard>
+            )}
           </div>
 
-          {/* Output Section */}
+          {/* Generated Script Display */}
           <div className="space-y-6">
-            {/* Generated Script */}
-            <GlassCard variant="glow">
-              <GlassCardHeader>
-                <GlassCardTitle className="flex items-center gap-2">
-                  <FileText className="w-6 h-6 text-primary" />
-                  Generirani Script
-                  {generatedScript && (
+            {generatedScript && (
+              <GlassCard>
+                <GlassCardHeader>
+                  <div className="flex items-center justify-between">
+                    <GlassCardTitle className="flex items-center gap-2">
+                      <FileText className="w-6 h-6 text-primary" />
+                      Generirani Script
+                    </GlassCardTitle>
                     <Button
                       onClick={() => setIsEditingScript(!isEditingScript)}
+                      variant="outline"
                       size="sm"
-                      variant="ghost"
-                      className="ml-auto"
+                      className="glass-button"
                     >
                       <Edit3 className="w-4 h-4" />
                     </Button>
+                  </div>
+                </GlassCardHeader>
+                <GlassCardContent>
+                  {isEditingScript ? (
+                    <Textarea
+                      value={generatedScript}
+                      onChange={(e) => setGeneratedScript(e.target.value)}
+                      className="min-h-96 glass border-glass-border font-mono text-sm"
+                    />
+                  ) : (
+                    <div className="glass p-4 rounded-lg max-h-96 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap text-sm leading-relaxed">
+                        {generatedScript}
+                      </pre>
+                    </div>
                   )}
-                </GlassCardTitle>
-              </GlassCardHeader>
-              <GlassCardContent>
-                {!generatedScript ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                    <p>Script će se pojaviti ovdje nakon generiranja</p>
-                    <p className="text-sm mt-2">Unesite OpenAI API ključ i generirajte script</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {isEditingScript ? (
-                      <div className="space-y-3">
-                        <Textarea
-                          value={generatedScript}
-                          onChange={(e) => setGeneratedScript(e.target.value)}
-                          className="min-h-96 glass border-glass-border font-mono text-sm"
-                          placeholder="Uređujte script ovdje..."
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => setIsEditingScript(false)}
-                            className="glass-button"
-                          >
-                            Spremi izmjene
-                          </Button>
-                          <Button
-                            onClick={() => setIsEditingScript(false)}
-                            variant="outline"
-                            className="glass-button"
-                          >
-                            Otkaži
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="glass p-4 rounded-lg">
-                        <div className="whitespace-pre-wrap font-mono text-sm">
-                          {generatedScript}
-                        </div>
-                        <div className="flex gap-2 mt-4 pt-4 border-t border-glass-border">
-                          <Button
-                            onClick={() => setIsEditingScript(true)}
-                            size="sm"
-                            variant="outline"
-                            className="glass-button"
-                          >
-                            <Edit3 className="w-4 h-4 mr-2" />
-                            Uredi
-                          </Button>
-                          <Button
-                            onClick={regenerateScript}
-                            size="sm"
-                            variant="outline"
-                            className="glass-button"
-                            disabled={isGeneratingScript}
-                          >
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Regeneriraj
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              navigator.clipboard.writeText(generatedScript);
-                              toast.success("Script kopiran u clipboard!");
-                            }}
-                            size="sm"
-                            variant="outline"
-                            className="glass-button ml-auto"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Kopiraj
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </GlassCardContent>
-            </GlassCard>
-
-            <GlassCard variant="secondary">
-              <GlassCardHeader>
-                <GlassCardTitle className="flex items-center gap-2">
-                  <Users className="w-6 h-6 text-secondary" />
-                  Generirani Avatari
-                </GlassCardTitle>
-              </GlassCardHeader>
-              <GlassCardContent>
-                {avatars.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                    <p>Avatari će se pojaviti ovdje nakon generiranja</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {avatars.map((avatar) => (
-                      <div key={avatar.id} className="glass p-4 rounded-xl">
-                        <div className="flex items-center gap-4">
-                           <div className="w-16 h-16 rounded-full cyber-gradient-secondary flex items-center justify-center overflow-hidden">
-                             {avatar.image ? (
-                               <img 
-                                 src={avatar.image} 
-                                 alt={avatar.name}
-                                 className="w-full h-full object-cover"
-                               />
-                             ) : (
-                               <User className="w-8 h-8 text-white" />
-                             )}
-                           </div>
-                           <div className="flex-1">
-                             <h3 className="font-semibold text-lg">{avatar.name}</h3>
-                             {avatar.description && (
-                               <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                 {avatar.description}
-                               </p>
-                             )}
-                             <div className="flex gap-2 mt-2">
-                               <Badge variant={avatar.gender === 'male' ? 'default' : 'secondary'}>
-                                 {avatar.gender === 'male' ? 'Muški' : 'Ženski'}
-                               </Badge>
-                               <Badge variant="outline">
-                                 {avatar.voice}
-                               </Badge>
-                             </div>
-                           </div>
-                        </div>
-
-                        <Tabs defaultValue="audio" className="mt-4">
-                          <TabsList className="grid w-full grid-cols-3 glass">
-                            <TabsTrigger value="audio" className="flex items-center gap-1">
-                              <Mic className="w-4 h-4" />
-                              Audio
-                            </TabsTrigger>
-                            <TabsTrigger value="video" className="flex items-center gap-1">
-                              <Video className="w-4 h-4" />
-                              Video
-                            </TabsTrigger>
-                            <TabsTrigger value="image" className="flex items-center gap-1">
-                              <Image className="w-4 h-4" />
-                              Slika
-                            </TabsTrigger>
-                          </TabsList>
-                          
-                          <TabsContent value="audio" className="mt-4">
-                            <div className="glass p-4 rounded-lg">
-                              <div className="w-full h-12 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-lg flex items-center justify-center">
-                                <Mic className="w-6 h-6 text-primary" />
-                              </div>
-                              <div className="flex justify-between items-center mt-2">
-                                <span className="text-sm text-muted-foreground">Voice Sample</span>
-                                <Button size="sm" variant="outline" className="glass-button">
-                                  <Download className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </TabsContent>
-                          
-                          <TabsContent value="video" className="mt-4">
-                            <div className="glass p-4 rounded-lg">
-                              <div className="w-full h-32 bg-gradient-to-br from-secondary/20 to-accent/20 rounded-lg flex items-center justify-center">
-                                <Video className="w-8 h-8 text-secondary" />
-                              </div>
-                              <div className="flex justify-between items-center mt-2">
-                                <span className="text-sm text-muted-foreground">Video Preview</span>
-                                <Button size="sm" variant="outline" className="glass-button">
-                                  <Download className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </TabsContent>
-                          
-                           <TabsContent value="image" className="mt-4">
-                             <div className="glass p-4 rounded-lg">
-                               <div className="w-full h-32 bg-gradient-to-tr from-accent/20 to-primary/20 rounded-lg flex items-center justify-center overflow-hidden">
-                                 {avatar.image ? (
-                                   <img 
-                                     src={avatar.image} 
-                                     alt={`${avatar.name} full image`}
-                                     className="w-full h-full object-cover rounded-lg"
-                                   />
-                                 ) : (
-                                   <Image className="w-8 h-8 text-accent" />
-                                 )}
-                               </div>
-                               <div className="flex justify-between items-center mt-2">
-                                 <span className="text-sm text-muted-foreground">
-                                   {avatar.image ? 'Realistični Avatar' : 'Avatar Image'}
-                                 </span>
-                                 <Button size="sm" variant="outline" className="glass-button">
-                                   <Download className="w-4 h-4" />
-                                 </Button>
-                               </div>
-                             </div>
-                           </TabsContent>
-                        </Tabs>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </GlassCardContent>
-            </GlassCard>
+                </GlassCardContent>
+              </GlassCard>
+            )}
           </div>
         </div>
       </div>
