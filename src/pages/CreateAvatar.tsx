@@ -232,7 +232,16 @@ export default function CreateAvatar() {
       return;
     }
 
-    const voiceId = voiceConfig.voiceId === "custom" ? voiceConfig.customVoiceId : voiceConfig.voiceId;
+    let voiceId = voiceConfig.voiceId;
+    
+    // Handle custom voice ID or predefined voices  
+    if (voiceConfig.voiceId === "custom") {
+      voiceId = voiceConfig.customVoiceId;
+    } else if (voiceConfig.voiceId === "bosanac-sarajlija") {
+      // Replace with your actual ElevenLabs voice ID
+      voiceId = "YOUR_BOSANAC_VOICE_ID"; // User needs to provide this
+    }
+    
     if (!voiceId) {
       toast.error("Molimo unesite voice ID");
       return;
@@ -651,17 +660,18 @@ export default function CreateAvatar() {
                               <SelectTrigger className="glass border-glass-border">
                                 <SelectValue placeholder="Izaberite voice" />
                               </SelectTrigger>
-                              <SelectContent className="glass border-glass-border">
-                                <SelectItem value="21m00Tcm4TlvDq8ikWAM">Rachel</SelectItem>
-                                <SelectItem value="AZnzlk1XvdvUeBnXmlld">Domi</SelectItem>
-                                <SelectItem value="EXAVITQu4vr4xnSDxMaL">Bella</SelectItem>
-                                <SelectItem value="ErXwobaYiN019PkySvjV">Antoni</SelectItem>
-                                <SelectItem value="MF3mGyEYCl7XYWbV9V6O">Elli</SelectItem>
-                                <SelectItem value="TxGEqnHWrfWFTfGW9XjX">Josh</SelectItem>
-                                <SelectItem value="VR6AewLTigWG4xSOukaG">Arnold</SelectItem>
-                                <SelectItem value="pNInz6obpgDQGcFmaJgB">Adam</SelectItem>
-                                <SelectItem value="yoZ06aMxZJJ28mfd3POQ">Sam</SelectItem>
-                                <SelectItem value="custom">Custom Voice ID</SelectItem>
+                               <SelectContent className="glass border-glass-border">
+                                 <SelectItem value="21m00Tcm4TlvDq8ikWAM">Rachel</SelectItem>
+                                 <SelectItem value="AZnzlk1XvdvUeBnXmlld">Domi</SelectItem>
+                                 <SelectItem value="EXAVITQu4vr4xnSDxMaL">Bella</SelectItem>
+                                 <SelectItem value="ErXwobaYiN019PkySvjV">Antoni</SelectItem>
+                                 <SelectItem value="MF3mGyEYCl7XYWbV9V6O">Elli</SelectItem>
+                                 <SelectItem value="TxGEqnHWrfWFTfGW9XjX">Josh</SelectItem>
+                                 <SelectItem value="VR6AewLTigWG4xSOukaG">Arnold</SelectItem>
+                                 <SelectItem value="pNInz6obpgDQGcFmaJgB">Adam</SelectItem>
+                                 <SelectItem value="yoZ06aMxZJJ28mfd3POQ">Sam</SelectItem>
+                                 <SelectItem value="bosanac-sarajlija">Bosanac/Sarajlija (Custom)</SelectItem>
+                                 <SelectItem value="custom">Custom Voice ID</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
