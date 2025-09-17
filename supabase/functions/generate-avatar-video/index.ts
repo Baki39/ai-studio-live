@@ -43,7 +43,7 @@ serve(async (req) => {
     }
 
     // Call Runway API
-    const runwayResponse = await fetch('https://api.runwayml.com/v1/image_to_video', {
+    const runwayResponse = await fetch('https://api.dev.runwayml.com/v1/image_to_video', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${runwayApiKey}`,
