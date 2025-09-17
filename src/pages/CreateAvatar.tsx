@@ -624,18 +624,21 @@ export default function CreateAvatar() {
       }
 
       // Create avatar with video
+      const videoUrl = response.data?.videoUrl || response.data?.output?.url || null;
+      console.log('Generated video URL:', videoUrl);
+      
       const newAvatar: GeneratedAvatar = {
         id: `avatar-${selectedAvatarForCreation + 1}-${Date.now()}`,
         name: `Avatar ${selectedAvatarForCreation + 1}`,
         gender: selectedAvatarForCreation % 2 === 0 ? selectedGender : (selectedGender === 'male' ? 'female' : 'male'),
         voice: voiceConfig?.voiceId || 'default',
         image: selectedAvatarImage,
-        video: response.data?.videoUrl || null,
+        video: videoUrl,
         audio: null, // Store the audio separately if needed
         description: avatarDescription || `Profesionalni avatar sa sinhronizovanim glasom i pokretima`
       };
 
-      setCreatedAvatarVideo(response.data?.videoUrl || null);
+      setCreatedAvatarVideo(videoUrl);
       setAvatars(prev => [...prev, newAvatar]);
       toast.success("Avatar sa videom uspješno kreiran!");
 
