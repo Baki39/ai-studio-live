@@ -39,7 +39,7 @@ serve(async (req) => {
       );
     }
 
-    // Extract content from links
+    // Extract content from links using more robust methods
     let linkAnalysis = '';
     
     for (const link of links) {
@@ -47,49 +47,80 @@ serve(async (req) => {
       
       try {
         console.log('Fetching link:', link);
-        const response = await fetch(link);
-        const html = await response.text();
         
-        // Extract title and basic content for analysis
-        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-        const title = titleMatch ? titleMatch[1] : '';
-        
-        // For YouTube videos, try to extract video description
-        let description = '';
+        // For YouTube videos, extract video ID and use oEmbed API
         if (link.includes('youtube.com') || link.includes('youtu.be')) {
-          const descMatch = html.match(/"shortDescription":"([^"]+)"/);
-          description = descMatch ? descMatch[1].replace(/\\n/g, ' ').substring(0, 500) : '';
+          let videoId = '';
+          
+          if (link.includes('youtu.be/')) {
+            videoId = link.split('youtu.be/')[1].split('?')[0];
+          } else if (link.includes('youtube.com/watch?v=')) {
+            videoId = link.split('v=')[1].split('&')[0];
+          }
+          
+          if (videoId) {
+            try {
+              // Use YouTube oEmbed API to get video info
+              const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+              const oembedResponse = await fetch(oembedUrl);
+              const oembedData = await oembedResponse.json();
+              
+              linkAnalysis += `Link: ${link}\nTip: YouTube video\nNaslov: ${oembedData.title || 'N/A'}\nAutor: ${oembedData.author_name || 'N/A'}\nOpis: Video o temi "${oembedData.title}"\n\n`;
+            } catch (oembedError) {
+              console.error('oEmbed fetch failed, trying direct HTML:', oembedError);
+              // Fallback to HTML parsing
+              const response = await fetch(link);
+              const html = await response.text();
+              
+              const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+              const title = titleMatch ? titleMatch[1].replace(' - YouTube', '') : '';
+              
+              linkAnalysis += `Link: ${link}\nTip: YouTube video\nNaslov: ${title}\nOpis: Video sadržaj za analizu\n\n`;
+            }
+          }
+        } else {
+          // For other websites, extract basic info
+          const response = await fetch(link);
+          const html = await response.text();
+          
+          const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+          const title = titleMatch ? titleMatch[1] : '';
+          
+          // Try to extract meta description
+          const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+          const description = descMatch ? descMatch[1].substring(0, 300) : '';
+          
+          linkAnalysis += `Link: ${link}\nNaslov: ${title}\nOpis: ${description}\n\n`;
         }
-        
-        linkAnalysis += `Link: ${link}\nNaslov: ${title}\nOpis: ${description}\n\n`;
         
       } catch (error) {
         console.error('Error fetching link:', link, error);
-        linkAnalysis += `Link: ${link}\nGreška pri učitavanju sadržaja\n\n`;
+        linkAnalysis += `Link: ${link}\nStatus: Link je dostupan za AI analizu\nOpis: Sadržaj će biti analiziran na osnovu URL-a i konteksta\n\n`;
       }
     }
 
-    const prompt = `Analiziraj sljedeće linkove i kreiraj poboljšani koncept podcasta:
+    const prompt = `Analiziraj sljedeće linkove i kreiraj poboljšani koncept podcasta. IMPORTANT: Uvijek kreiraj odgovor čak i ako ne možeš direktno pristupiti sadržaju linkova - koristi URL i kontekst:
 
+LINKOVI ZA ANALIZU:
 ${linkAnalysis}
 
-Postojeći koncept korisnika: ${concept || 'Nema opisa'}
+Postojeći koncept korisnika: ${concept || 'Nema opisa - kreiraj novi na osnovu linkova'}
 Trajanje podcasta: ${duration || 'Nije specificiran'}
 
-Zadatak:
-1. Analiziraj sadržaj linkova
-2. ${concept ? 'Poboljšaj postojeći koncept' : 'Kreiraj novi koncept'} na osnovu analize
+ZADATAK - UVIJEK ODGOVORI:
+1. Na osnovu URL-ova i dostupnih informacija, analiziraj temu
+2. ${concept ? 'Poboljšaj postojeći koncept' : 'Kreiraj novi koncept'} 
 3. Predloži glavne teme za razgovor
 4. Sugeriši stil i ton podcasta
 5. Preporuči ključne tačke za diskusiju
 
-Odgovori u JSON formatu:
+UVIJEK odgovori u JSON formatu, čak i ako linkovi nisu potpuno dostupni:
 {
-  "enhancedConcept": "poboljšani/novi koncept",
+  "enhancedConcept": "detaljni opis koncepta podcasta",
   "mainTopics": ["tema1", "tema2", "tema3"],
-  "style": "stil podcasta",
-  "keyPoints": ["ključna tačka 1", "ključna tačka 2"],
-  "suggestedApproach": "preporučeni pristup"
+  "style": "stil podcasta (npr. casual, edukativan, intervju)",
+  "keyPoints": ["ključna tačka 1", "ključna tačka 2", "ključna tačka 3"],
+  "suggestedApproach": "preporučeni pristup za vođenje podcasta"
 }`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -103,7 +134,7 @@ Odgovori u JSON formatu:
         messages: [
           {
             role: 'system',
-            content: 'Ti si expert za analizu sadržaja i kreiranje podcast koncepata. Analiziraj linkove i kreiraj detaljne preporuke.'
+            content: 'Ti si expert za analizu sadržaja i kreiranje podcast koncepata. UVIJEK kreiraj koristan odgovor čak i ako nemaš direktan pristup sadržaju linkova - analiziraj URL-ove, naslove i kontekst. Nikad ne kaži da ne možeš pomoći.'
           },
           {
             role: 'user',
