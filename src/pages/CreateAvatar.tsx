@@ -361,12 +361,27 @@ export default function CreateAvatar() {
         throw new Error('Nema audio sadržaja u odgovoru');
       }
 
-      // Convert base64 to blob and create URL
-      const audioBlob = new Blob(
-        [Uint8Array.from(atob((data as any).audioContent), c => c.charCodeAt(0))],
-        { type: (data as any).mimeType || 'audio/mpeg' }
-      );
-      const audioUrl = URL.createObjectURL(audioBlob);
+      // Convert base64 to blob and create URL with proper error handling
+      let audioUrl;
+      try {
+        const base64Audio = (data as any).audioContent;
+        if (!base64Audio || typeof base64Audio !== 'string') {
+          throw new Error('Invalid base64 audio content');
+        }
+        
+        // Decode base64 safely
+        const binaryString = atob(base64Audio);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        const audioBlob = new Blob([bytes], { type: (data as any).mimeType || 'audio/mpeg' });
+        audioUrl = URL.createObjectURL(audioBlob);
+      } catch (decodeError) {
+        console.error('Error decoding base64 audio:', decodeError);
+        throw new Error('Greška pri dekodiranju audio sadržaja');
+      }
       
       const newGeneratedVoices = [...generatedVoices];
       newGeneratedVoices[avatarIndex] = audioUrl;
