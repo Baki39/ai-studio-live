@@ -498,6 +498,30 @@ export default function CreateAvatar() {
     }
   };
 
+  const createAvatarWithVoice = (avatarIndex: number) => {
+    const voiceConfig = avatarVoices[avatarIndex];
+    const generatedVoice = generatedVoices[avatarIndex];
+    
+    if (!generatedVoice) {
+      toast.error("Nema generisanog glasa za ovaj avatar");
+      return;
+    }
+    
+    const newAvatar: GeneratedAvatar = {
+      id: `avatar-${avatarIndex + 1}-${Date.now()}`,
+      name: `Avatar ${avatarIndex + 1}`,
+      gender: avatarIndex % 2 === 0 ? selectedGender : (selectedGender === 'male' ? 'female' : 'male'),
+      voice: voiceConfig?.voiceId || 'default',
+      image: avatarImagePreview,
+      video: null,
+      audio: null,
+      description: avatarDescription || `Profesionalni ${avatarIndex % 2 === 0 ? selectedGender === 'male' ? 'muški' : 'ženski' : selectedGender === 'male' ? 'ženski' : 'muški'} avatar sa generisanim glasom`
+    };
+    
+    setAvatars(prev => [...prev, newAvatar]);
+    toast.success(`Avatar ${avatarIndex + 1} sa glasom uspješno kreiran!`);
+  };
+
   const generateAvatars = async () => {
     setIsGenerating(true);
     try {
@@ -863,6 +887,16 @@ export default function CreateAvatar() {
                                 className="glass-button"
                               >
                                 <Download className="w-3 h-3" />
+                              </Button>
+                              
+                              <Button
+                                onClick={() => createAvatarWithVoice(index)}
+                                size="sm"
+                                variant="default"
+                                className="glass-button bg-primary text-primary-foreground hover:bg-primary/90"
+                              >
+                                <UserCheck className="w-3 h-3 mr-1" />
+                                Kreiraj Avatar
                               </Button>
                             </div>
                           )}
