@@ -595,9 +595,11 @@ export default function CreateAvatar() {
         });
       }, 1000);
 
-      // Get podcast duration (parse from duration string)
-      const durationValue = duration.includes('3-5') ? 4 : duration.includes('5-8') ? 6 : 3;
-      const finalDuration = Math.max(3, Math.min(5, durationValue)); // 3-5 minutes
+      // Get podcast duration (now in seconds)
+      const durationValue = parseInt(duration) || 5; // Default to 5 seconds
+      const finalDuration = Math.max(5, Math.min(10, durationValue)); // 5-10 seconds
+      
+      console.log('Using duration for video generation:', finalDuration, 'seconds');
       
       // Create video generation request
       const response = await supabase.functions.invoke('generate-avatar-video', {
@@ -608,7 +610,7 @@ export default function CreateAvatar() {
             voice: voiceConfig?.voiceId || 'default'
           },
           audioUrl: generatedVoice,
-          duration: finalDuration * 60, // Convert to seconds
+          duration: finalDuration, // Already in seconds
           emotions: ['neutral', 'smile', 'talking', 'laugh', 'nod'],
           movements: ['head_nod', 'slight_turn', 'blink', 'mouth_sync']
         }
@@ -841,11 +843,8 @@ export default function CreateAvatar() {
                       <SelectValue placeholder="Izaberi trajanje..." />
                     </SelectTrigger>
                     <SelectContent className="glass border-glass-border">
-                      <SelectItem value="0-1">0-1 minuta</SelectItem>
-                      <SelectItem value="1-3">1-3 minuta</SelectItem>
-                      <SelectItem value="3-5">3-5 minuta</SelectItem>
-                      <SelectItem value="5-8">5-8 minuta</SelectItem>
-                      <SelectItem value="8-10">8-10 minuta</SelectItem>
+                      <SelectItem value="5">5 sekundi</SelectItem>
+                      <SelectItem value="10">10 sekundi</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
