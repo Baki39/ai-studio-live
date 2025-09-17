@@ -32,6 +32,11 @@ serve(async (req) => {
       hasImage: !!avatar.image
     })
 
+    // Runway gen4_turbo only supports duration of 5 or 10 seconds
+    const validDuration = duration > 7 ? 10 : 5
+
+    console.log(`Adjusting duration from ${duration} to ${validDuration} for gen4_turbo compatibility`)
+
     // Initialize Runway client with API key
     const client = new RunwayML({
       apiKey: runwayApiKey,
@@ -42,9 +47,9 @@ serve(async (req) => {
       .create({
         model: 'gen4_turbo',
         promptImage: avatar.image,
-        promptText: `Create a realistic avatar video of a ${avatar.gender} person speaking. The person should have natural facial expressions, lip sync with the audio, and professional appearance. Duration: ${duration} seconds. Include subtle movements like blinking, head nods, and natural gestures.`,
+        promptText: `Create a realistic avatar video of a ${avatar.gender} person speaking. The person should have natural facial expressions, lip sync with the audio, and professional appearance. Include subtle movements like blinking, head nods, and natural gestures.`,
         ratio: '16:9',
-        duration: duration || 5,
+        duration: validDuration,
       })
       .waitForTaskOutput()
 
