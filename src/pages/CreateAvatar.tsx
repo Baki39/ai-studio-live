@@ -47,6 +47,7 @@ interface GeneratedAvatar {
 export default function CreateAvatar() {
   const [concept, setConcept] = useState("");
   const [links, setLinks] = useState<string[]>([""]);
+  const [duration, setDuration] = useState("");
   const [avatars, setAvatars] = useState<GeneratedAvatar[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   
@@ -376,6 +377,22 @@ export default function CreateAvatar() {
                       Dodaj link
                     </Button>
                   </div>
+                </div>
+
+                <div>
+                  <Label>Trajanje live podcast-a</Label>
+                  <Select value={duration} onValueChange={setDuration}>
+                    <SelectTrigger className="glass border-glass-border">
+                      <SelectValue placeholder="Izaberi trajanje..." />
+                    </SelectTrigger>
+                    <SelectContent className="glass border-glass-border">
+                      <SelectItem value="0-1">0-1 minuta</SelectItem>
+                      <SelectItem value="1-3">1-3 minuta</SelectItem>
+                      <SelectItem value="3-5">3-5 minuta</SelectItem>
+                      <SelectItem value="5-8">5-8 minuta</SelectItem>
+                      <SelectItem value="8-10">8-10 minuta</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </GlassCardContent>
             </GlassCard>
