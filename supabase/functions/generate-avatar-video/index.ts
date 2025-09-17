@@ -13,17 +13,17 @@ serve(async (req) => {
 
   try {
     const { avatar, audioUrl, duration, emotions, movements } = await req.json()
-    const veo2ApiKey = Deno.env.get('VEO2_API_KEY')
+    const runwayApiKey = Deno.env.get('RUNWAY_API_KEY')
 
     if (!avatar || !audioUrl) {
       throw new Error('Avatar data and audio are required')
     }
 
-    if (!veo2ApiKey) {
-      throw new Error('VEO2_API_KEY is not configured')
+    if (!runwayApiKey) {
+      throw new Error('RUNWAY_API_KEY is not configured')
     }
 
-    console.log('Generating avatar video with veo2:', {
+    console.log('Generating avatar video with Runway:', {
       gender: avatar.gender,
       duration,
       emotions: emotions?.length || 0,
@@ -31,45 +31,45 @@ serve(async (req) => {
       hasImage: !!avatar.image
     })
 
-    // Prepare veo2 request payload
-    const veo2Payload = {
-      model: "veo-2",
+    // Prepare Runway request payload
+    const runwayPayload = {
+      model: "gen-3a-turbo",
       prompt: `Create a realistic avatar video of a ${avatar.gender} person speaking. The person should have natural facial expressions, lip sync with the audio, and professional appearance. Duration: ${duration} seconds. Include subtle movements like blinking, head nods, and natural gestures.`,
-      audio_url: audioUrl,
-      image_url: avatar.image,
+      image: avatar.image,
+      audio: audioUrl,
       duration: duration,
       aspect_ratio: "16:9",
-      quality: "high"
+      watermark: false
     }
 
-    // Call veo2 API
-    const veo2Response = await fetch('https://api.veo2.ai/v1/videos/generate', {
+    // Call Runway API
+    const runwayResponse = await fetch('https://api.runwayml.com/v1/image_to_video', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${veo2ApiKey}`,
+        'Authorization': `Bearer ${runwayApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(veo2Payload)
+      body: JSON.stringify(runwayPayload)
     })
 
-    if (!veo2Response.ok) {
-      const errorText = await veo2Response.text()
-      console.error('Veo2 API error:', errorText)
-      throw new Error(`Veo2 API error: ${veo2Response.status} - ${errorText}`)
+    if (!runwayResponse.ok) {
+      const errorText = await runwayResponse.text()
+      console.error('Runway API error:', errorText)
+      throw new Error(`Runway API error: ${runwayResponse.status} - ${errorText}`)
     }
 
-    const veo2Result = await veo2Response.json()
-    console.log('Veo2 video generation result:', veo2Result)
+    const runwayResult = await runwayResponse.json()
+    console.log('Runway video generation result:', runwayResult)
 
     // Return the generated video URL
     return new Response(
       JSON.stringify({ 
-        videoUrl: veo2Result.video_url || veo2Result.url,
+        videoUrl: runwayResult.video_url || runwayResult.url,
         duration: duration,
         emotions: emotions,
         movements: movements,
         status: 'completed',
-        veo2_id: veo2Result.id
+        runway_id: runwayResult.id
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
