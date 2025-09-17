@@ -263,20 +263,31 @@ export default function CreateAvatar() {
       const { data, error } = await supabase.functions.invoke('generate-voice', {
         body: {
           text: avatarText,
-          voice_id: voiceId
+          voice_id: voiceId,
+          model_id: voiceConfig.model || "eleven_multilingual_v2",
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error((error as any).message || 'Greška sa server funkcijom');
+      }
 
-      if (data.error) {
-        throw new Error(data.error);
+      if (!data || (data as any).error) {
+        const msg = (data as any)?.error || 'Prazan odgovor sa servera';
+        console.error('Function returned error:', msg);
+        throw new Error(msg);
+      }
+
+      if (!(data as any).audioContent) {
+        console.error('No audioContent in response:', data);
+        throw new Error('Nema audio sadržaja u odgovoru');
       }
 
       // Convert base64 to blob and create URL
       const audioBlob = new Blob(
-        [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
-        { type: 'audio/mpeg' }
+        [Uint8Array.from(atob((data as any).audioContent), c => c.charCodeAt(0))],
+        { type: (data as any).mimeType || 'audio/mpeg' }
       );
       const audioUrl = URL.createObjectURL(audioBlob);
       
@@ -286,9 +297,9 @@ export default function CreateAvatar() {
       
       toast.success(`Voice za Avatar ${avatarIndex + 1} uspješno generiran!`);
       
-    } catch (error) {
-      console.error('Greška:', error);
-      toast.error("Greška pri generiranju voice-a. Molimo provjerite konfiguraciju.");
+    } catch (error: any) {
+      console.error('Greška pri generiranju voice-a:', error);
+      toast.error(error?.message || "Greška pri generiranju voice-a. Molimo provjerite konfiguraciju.");
     } finally {
       const newIsGenerating = [...isGeneratingVoices];
       newIsGenerating[avatarIndex] = false;

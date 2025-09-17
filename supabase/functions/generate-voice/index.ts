@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voice_id = "21m00Tcm4TlvDq8ikWAM" } = await req.json();
+    const { text, voice_id = "21m00Tcm4TlvDq8ikWAM", model_id = "eleven_multilingual_v2" } = await req.json();
 
     if (!text) {
       throw new Error('Text is required');
@@ -25,6 +25,7 @@ serve(async (req) => {
     }
 
     console.log('Generating voice for text:', text.substring(0, 100) + '...');
+    console.log('Using voice_id:', voice_id, 'model_id:', model_id);
 
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice_id}`, {
       method: 'POST',
@@ -34,8 +35,8 @@ serve(async (req) => {
         'xi-api-key': elevenLabsApiKey,
       },
       body: JSON.stringify({
-        text: text,
-        model_id: "eleven_multilingual_v2",
+        text,
+        model_id,
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.5
