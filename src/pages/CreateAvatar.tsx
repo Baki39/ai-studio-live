@@ -28,8 +28,16 @@ import {
   Play,
   Pause,
   Volume2,
-  Square
+  Square,
+  Send,
+  Monitor,
+  Camera,
+  Smile,
+  Heart,
+  Zap
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -498,28 +506,115 @@ export default function CreateAvatar() {
     }
   };
 
+  const [selectedAvatarForCreation, setSelectedAvatarForCreation] = useState<number | null>(null);
+  const [isCreatingVideo, setIsCreatingVideo] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [createdAvatarVideo, setCreatedAvatarVideo] = useState<string | null>(null);
+
   const createAvatarWithVoice = (avatarIndex: number) => {
-    const voiceConfig = avatarVoices[avatarIndex];
-    const generatedVoice = generatedVoices[avatarIndex];
+    setSelectedAvatarForCreation(avatarIndex);
+  };
+
+  const generateAvatarVideo = async () => {
+    if (selectedAvatarForCreation === null) return;
+    
+    const voiceConfig = avatarVoices[selectedAvatarForCreation];
+    const generatedVoice = generatedVoices[selectedAvatarForCreation];
     
     if (!generatedVoice) {
       toast.error("Nema generisanog glasa za ovaj avatar");
       return;
     }
+
+    setIsCreatingVideo(true);
+    setVideoProgress(0);
+
+    try {
+      // Simulate video generation progress
+      const progressInterval = setInterval(() => {
+        setVideoProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 1000);
+
+      // Get podcast duration (parse from duration string)
+      const durationValue = duration.includes('3-5') ? 4 : duration.includes('5-8') ? 6 : 3;
+      const finalDuration = Math.max(3, Math.min(5, durationValue)); // 3-5 minutes
+      
+      // Create video generation request
+      const response = await supabase.functions.invoke('generate-avatar-video', {
+        body: {
+          avatar: {
+            gender: selectedAvatarForCreation % 2 === 0 ? selectedGender : (selectedGender === 'male' ? 'female' : 'male'),
+            image: avatarImagePreview,
+            voice: voiceConfig?.voiceId || 'default'
+          },
+          audioBlob: generatedVoice,
+          duration: finalDuration * 60, // Convert to seconds
+          emotions: ['neutral', 'smile', 'talking', 'laugh', 'nod'],
+          movements: ['head_nod', 'slight_turn', 'blink', 'mouth_sync']
+        }
+      });
+
+      clearInterval(progressInterval);
+      setVideoProgress(100);
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      // Create avatar with video
+      const newAvatar: GeneratedAvatar = {
+        id: `avatar-${selectedAvatarForCreation + 1}-${Date.now()}`,
+        name: `Avatar ${selectedAvatarForCreation + 1}`,
+        gender: selectedAvatarForCreation % 2 === 0 ? selectedGender : (selectedGender === 'male' ? 'female' : 'male'),
+        voice: voiceConfig?.voiceId || 'default',
+        image: avatarImagePreview,
+        video: response.data?.videoUrl || null,
+        audio: null, // Store the audio separately if needed
+        description: avatarDescription || `Profesionalni avatar sa sinhronizovanim glasom i pokretima`
+      };
+
+      setCreatedAvatarVideo(response.data?.videoUrl || null);
+      setAvatars(prev => [...prev, newAvatar]);
+      toast.success("Avatar sa videom uspješno kreiran!");
+
+    } catch (error) {
+      console.error('Error generating avatar video:', error);
+      toast.error("Greška pri kreiranju avatar videa");
+    } finally {
+      setIsCreatingVideo(false);
+    }
+  };
+
+  const downloadAvatar = () => {
+    if (selectedAvatarForCreation === null || !createdAvatarVideo) return;
     
-    const newAvatar: GeneratedAvatar = {
-      id: `avatar-${avatarIndex + 1}-${Date.now()}`,
-      name: `Avatar ${avatarIndex + 1}`,
-      gender: avatarIndex % 2 === 0 ? selectedGender : (selectedGender === 'male' ? 'female' : 'male'),
-      voice: voiceConfig?.voiceId || 'default',
-      image: avatarImagePreview,
-      video: null,
-      audio: null,
-      description: avatarDescription || `Profesionalni ${avatarIndex % 2 === 0 ? selectedGender === 'male' ? 'muški' : 'ženski' : selectedGender === 'male' ? 'ženski' : 'muški'} avatar sa generisanim glasom`
-    };
+    const link = document.createElement('a');
+    link.href = createdAvatarVideo;
+    link.download = `avatar-${selectedAvatarForCreation + 1}-video.mp4`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Avatar video preuzet!");
+  };
+
+  const sendToPodcastLive = () => {
+    if (selectedAvatarForCreation === null) return;
     
-    setAvatars(prev => [...prev, newAvatar]);
-    toast.success(`Avatar ${avatarIndex + 1} sa glasom uspješno kreiran!`);
+    const avatar = avatars[avatars.length - 1]; // Latest created avatar
+    if (avatar) {
+      // Store avatar data in localStorage for Podcast Live
+      localStorage.setItem('selectedAvatar', JSON.stringify(avatar));
+      
+      // Navigate to Podcast Live
+      window.location.href = '/podcast-live';
+      toast.success("Avatar poslat u Podcast Live!");
+    }
   };
 
   const generateAvatars = async () => {
@@ -889,15 +984,193 @@ export default function CreateAvatar() {
                                 <Download className="w-3 h-3" />
                               </Button>
                               
-                              <Button
-                                onClick={() => createAvatarWithVoice(index)}
-                                size="sm"
-                                variant="default"
-                                className="glass-button bg-primary text-primary-foreground hover:bg-primary/90"
-                              >
-                                <UserCheck className="w-3 h-3 mr-1" />
-                                Kreiraj Avatar
-                              </Button>
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    onClick={() => createAvatarWithVoice(index)}
+                                    size="sm"
+                                    variant="default"
+                                    className="glass-button bg-primary text-primary-foreground hover:bg-primary/90"
+                                  >
+                                    <UserCheck className="w-3 h-3 mr-1" />
+                                    Kreiraj Avatar
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto glass border-glass-border">
+                                  <DialogHeader>
+                                    <DialogTitle className="text-2xl font-bold text-center bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                                      🎭 Kreiranje Avatara sa Video Animacijom
+                                    </DialogTitle>
+                                  </DialogHeader>
+                                  
+                                  <div className="space-y-6 p-2">
+                                    {/* Avatar Preview */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      <div className="space-y-4">
+                                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                                          <User className="w-5 h-5" />
+                                          Avatar Informacije
+                                        </h3>
+                                        <div className="glass p-4 rounded-lg space-y-3">
+                                          <div className="flex items-center gap-3">
+                                            <Badge variant="secondary">Avatar {index + 1}</Badge>
+                                            <Badge variant={index % 2 === 0 ? "default" : "secondary"}>
+                                              {index % 2 === 0 ? selectedGender === 'male' ? '👨 Muški' : '👩 Ženski' : selectedGender === 'male' ? '👩 Ženski' : '👨 Muški'}
+                                            </Badge>
+                                          </div>
+                                          {avatarImagePreview && (
+                                            <img 
+                                              src={avatarImagePreview} 
+                                              alt="Avatar preview" 
+                                              className="w-full h-32 object-cover rounded-lg border border-glass-border"
+                                            />
+                                          )}
+                                          <div className="text-sm text-muted-foreground">
+                                            <p><strong>Glas:</strong> {avatarVoices[index]?.voiceId || 'Default'}</p>
+                                            <p><strong>Tip:</strong> Profesionalni avatar</p>
+                                            <p><strong>Trajanje videa:</strong> {duration.includes('3-5') ? '4' : duration.includes('5-8') ? '6' : '3'} minuta</p>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="space-y-4">
+                                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                                          <Video className="w-5 h-5" />
+                                          Video Animacija
+                                        </h3>
+                                        <div className="glass p-4 rounded-lg space-y-3">
+                                          <div className="grid grid-cols-2 gap-2 text-sm">
+                                            <div className="flex items-center gap-2">
+                                              <Smile className="w-4 h-4 text-primary" />
+                                              <span>Emocije</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <Camera className="w-4 h-4 text-accent" />
+                                              <span>Pokreti</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <Volume2 className="w-4 h-4 text-primary" />
+                                              <span>Lip Sync</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <Heart className="w-4 h-4 text-red-500" />
+                                              <span>Animacije</span>
+                                            </div>
+                                          </div>
+                                          <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-3 rounded-lg">
+                                            <p className="text-sm text-center">
+                                              ✨ AI će kreirati realnu avatar animaciju sa:<br/>
+                                              • Sinhronizacija usta sa govorom<br/>
+                                              • Prirodni pokreti i gestovi<br/>
+                                              • Emocionalne ekspresije<br/>
+                                              • Profesionalni kvalitet videa
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Video Generation Progress */}
+                                    {isCreatingVideo && (
+                                      <div className="space-y-4">
+                                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                                          <Zap className="w-5 h-5 animate-pulse" />
+                                          Kreiranje Video Avatara...
+                                        </h3>
+                                        <div className="glass p-4 rounded-lg">
+                                          <div className="space-y-3">
+                                            <div className="flex justify-between text-sm">
+                                              <span>Progres</span>
+                                              <span>{videoProgress}%</span>
+                                            </div>
+                                            <Progress value={videoProgress} className="w-full" />
+                                            <div className="text-xs text-muted-foreground text-center">
+                                              {videoProgress < 30 && "🎯 Analiziranje audio sadržaja..."}
+                                              {videoProgress >= 30 && videoProgress < 60 && "🎭 Kreiranje avatar animacije..."}
+                                              {videoProgress >= 60 && videoProgress < 90 && "🎬 Renderovanje video sadržaja..."}
+                                              {videoProgress >= 90 && "✨ Finaliziranje..."}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Created Video Preview */}
+                                    {createdAvatarVideo && (
+                                      <div className="space-y-4">
+                                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                                          <Video className="w-5 h-5 text-green-500" />
+                                          Kreiran Avatar Video
+                                        </h3>
+                                        <div className="glass p-4 rounded-lg">
+                                          <video 
+                                            src={createdAvatarVideo} 
+                                            controls 
+                                            className="w-full rounded-lg border border-glass-border"
+                                            poster={avatarImagePreview || undefined}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Action Buttons */}
+                                    <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-glass-border">
+                                      {!isCreatingVideo && !createdAvatarVideo && (
+                                        <Button
+                                          onClick={generateAvatarVideo}
+                                          className="flex-1 glass-button bg-gradient-to-r from-primary to-accent text-white font-semibold py-3"
+                                          size="lg"
+                                        >
+                                          <Video className="w-5 h-5 mr-2" />
+                                          Generiši Avatar Video
+                                        </Button>
+                                      )}
+
+                                      {createdAvatarVideo && (
+                                        <>
+                                          <Button
+                                            onClick={downloadAvatar}
+                                            variant="outline"
+                                            className="flex-1 glass-button border-primary/50 hover:bg-primary/10"
+                                            size="lg"
+                                          >
+                                            <Download className="w-5 h-5 mr-2" />
+                                            Preuzmi Avatar
+                                          </Button>
+
+                                          <Button
+                                            onClick={sendToPodcastLive}
+                                            className="flex-1 glass-button bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold"
+                                            size="lg"
+                                          >
+                                            <Send className="w-5 h-5 mr-2" />
+                                            <Monitor className="w-4 h-4 mr-1" />
+                                            Pošalji u Podcast Live
+                                          </Button>
+                                        </>
+                                      )}
+                                    </div>
+
+                                    {/* Info Section */}
+                                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                                      <div className="flex items-start gap-3">
+                                        <div className="bg-blue-500 p-2 rounded-full">
+                                          <Brain className="w-4 h-4 text-white" />
+                                        </div>
+                                        <div className="text-sm">
+                                          <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                                            AI Avatar Tehnologija
+                                          </h4>
+                                          <p className="text-blue-700 dark:text-blue-300">
+                                            Naš napredni AI sistem automatski sinhronizuje govor sa pokretima usta, 
+                                            kreira prirodne gestove i emocionalne ekspresije za maksimalno realistične avatar videe.
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
                             </div>
                           )}
                         </div>
