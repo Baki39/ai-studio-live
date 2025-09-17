@@ -1,72 +1,68 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const { prompt } = await req.json();
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    const { prompt } = await req.json()
+    const runwayApiKey = Deno.env.get('RUNWAY_API_KEY')
 
-    if (!openAIApiKey) {
-      throw new Error('OPENAI_API_KEY is not configured');
+    if (!runwayApiKey) {
+      throw new Error('RUNWAY_API_KEY is not configured')
     }
 
     if (!prompt) {
-      throw new Error('Prompt is required');
+      throw new Error('Prompt is required')
     }
 
-    console.log('Generating image with prompt:', prompt);
+    console.log('Generating image with Runway, prompt:', prompt)
 
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    const response = await fetch('https://api.runwayml.com/v1/text_to_image', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${runwayApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-image-1',
+        model: 'runway-ml/runway-ml-img-gen',
         prompt: prompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'high',
-        output_format: 'png'
+        width: 1024,
+        height: 1024,
+        guidance_scale: 7,
+        num_inference_steps: 25,
+        seed: Math.floor(Math.random() * 1000000)
       }),
-    });
+    })
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      const errorText = await response.text()
+      console.error('Runway API error:', errorText)
+      throw new Error(`Runway API error: ${response.status} - ${errorText}`)
     }
 
-    const data = await response.json();
-    console.log('Image generation successful');
-
-    // The response contains base64 data for gpt-image-1
-    const imageUrl = data.data[0].b64_json ? 
-      `data:image/png;base64,${data.data[0].b64_json}` : 
-      data.data[0].url;
+    const data = await response.json()
+    console.log('Runway image generation successful')
 
     return new Response(JSON.stringify({ 
-      imageUrl: imageUrl,
-      model: 'gpt-image-1'
+      imageUrl: data.image_url || data.url,
+      model: 'runway-ml',
+      runway_id: data.id
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    })
   } catch (error) {
-    console.error('Error in generate-image function:', error);
+    console.error('Error in generate-image function:', error)
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    })
   }
-});
+})

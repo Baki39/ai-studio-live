@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.generate-voice]
 verify_jwt = false
+
+[functions.generate-image]
+verify_jwt = false
+
+[functions.generate-avatar-video]
+verify_jwt = false
