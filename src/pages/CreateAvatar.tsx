@@ -238,9 +238,11 @@ export default function CreateAvatar() {
     if (voiceConfig.voiceId === "custom") {
       voiceId = voiceConfig.customVoiceId;
     } else if (voiceConfig.voiceId === "bosanac-sarajlija") {
-      // Replace with your actual ElevenLabs voice ID
       voiceId = "lAB2lrSx4vWAj0r5TaOa"; // Bosanac/Sarajlija custom voice
+      console.log("Using Bosanac/Sarajlija voice:", voiceId);
     }
+    
+    console.log("Final voice ID:", voiceId, "for voice config:", voiceConfig);
     
     if (!voiceId) {
       toast.error("Molimo unesite voice ID");
