@@ -56,9 +56,11 @@ serve(async (req) => {
     console.log('Runway video generation result:', task)
 
     // Return the generated video URL
+    const videoUrl = Array.isArray(task.output) ? task.output[0] : task.output?.url || task.output;
+    
     return new Response(
       JSON.stringify({ 
-        videoUrl: task.output?.url,
+        videoUrl: videoUrl,
         duration: duration,
         emotions: emotions,
         movements: movements,
