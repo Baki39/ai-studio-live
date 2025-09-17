@@ -510,9 +510,58 @@ export default function CreateAvatar() {
   const [isCreatingVideo, setIsCreatingVideo] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [createdAvatarVideo, setCreatedAvatarVideo] = useState<string | null>(null);
+  
+  // Image generation/upload states
+  const [selectedAvatarImage, setSelectedAvatarImage] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [uploadedAvatarFile, setUploadedAvatarFile] = useState<File | null>(null);
+
+  const generateAvatarImage = async () => {
+    if (!imagePrompt.trim()) {
+      toast.error("Molimo unesite opis slike");
+      return;
+    }
+
+    setIsGeneratingImage(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt: imagePrompt }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setSelectedAvatarImage(data.imageUrl);
+      toast.success("Slika avatara uspješno generirana!");
+    } catch (error) {
+      console.error('Error generating image:', error);
+      toast.error("Greška pri generiranju slike");
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const handleAvatarImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setUploadedAvatarFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setSelectedAvatarImage(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+      toast.success("Slika uspješno učitana!");
+    }
+  };
 
   const createAvatarWithVoice = (avatarIndex: number) => {
     setSelectedAvatarForCreation(avatarIndex);
+    // Reset image selection when creating new avatar
+    setSelectedAvatarImage(null);
+    setImagePrompt("");
+    setUploadedAvatarFile(null);
   };
 
   const generateAvatarVideo = async () => {
@@ -523,6 +572,11 @@ export default function CreateAvatar() {
     
     if (!generatedVoice) {
       toast.error("Nema generisanog glasa za ovaj avatar");
+      return;
+    }
+
+    if (!selectedAvatarImage) {
+      toast.error("Molimo odaberite ili generirajte sliku avatara");
       return;
     }
 
@@ -550,10 +604,10 @@ export default function CreateAvatar() {
         body: {
           avatar: {
             gender: selectedAvatarForCreation % 2 === 0 ? selectedGender : (selectedGender === 'male' ? 'female' : 'male'),
-            image: avatarImagePreview,
+            image: selectedAvatarImage,
             voice: voiceConfig?.voiceId || 'default'
           },
-          audioBlob: generatedVoice,
+          audioUrl: generatedVoice,
           duration: finalDuration * 60, // Convert to seconds
           emotions: ['neutral', 'smile', 'talking', 'laugh', 'nod'],
           movements: ['head_nod', 'slight_turn', 'blink', 'mouth_sync']
@@ -573,7 +627,7 @@ export default function CreateAvatar() {
         name: `Avatar ${selectedAvatarForCreation + 1}`,
         gender: selectedAvatarForCreation % 2 === 0 ? selectedGender : (selectedGender === 'male' ? 'female' : 'male'),
         voice: voiceConfig?.voiceId || 'default',
-        image: avatarImagePreview,
+        image: selectedAvatarImage,
         video: response.data?.videoUrl || null,
         audio: null, // Store the audio separately if needed
         description: avatarDescription || `Profesionalni avatar sa sinhronizovanim glasom i pokretima`
@@ -1018,13 +1072,13 @@ export default function CreateAvatar() {
                                               {index % 2 === 0 ? selectedGender === 'male' ? '👨 Muški' : '👩 Ženski' : selectedGender === 'male' ? '👩 Ženski' : '👨 Muški'}
                                             </Badge>
                                           </div>
-                                          {avatarImagePreview && (
-                                            <img 
-                                              src={avatarImagePreview} 
-                                              alt="Avatar preview" 
-                                              className="w-full h-32 object-cover rounded-lg border border-glass-border"
-                                            />
-                                          )}
+                                           {(selectedAvatarImage || avatarImagePreview) && (
+                                             <img 
+                                               src={selectedAvatarImage || avatarImagePreview || ""} 
+                                               alt="Avatar preview" 
+                                               className="w-full h-32 object-cover rounded-lg border border-glass-border"
+                                             />
+                                           )}
                                           <div className="text-sm text-muted-foreground">
                                             <p><strong>Glas:</strong> {avatarVoices[index]?.voiceId || 'Default'}</p>
                                             <p><strong>Tip:</strong> Profesionalni avatar</p>
@@ -1068,7 +1122,81 @@ export default function CreateAvatar() {
                                           </div>
                                         </div>
                                       </div>
-                                    </div>
+                                     </div>
+
+                                     {/* Image Generation/Upload Section */}
+                                     <div className="space-y-4">
+                                       <h3 className="text-lg font-semibold flex items-center gap-2">
+                                         <Image className="w-5 h-5 text-blue-500" />
+                                         Avatar Slika
+                                       </h3>
+                                       <div className="glass p-4 rounded-lg">
+                                         <Tabs defaultValue="generate" className="w-full">
+                                           <TabsList className="grid w-full grid-cols-2 mb-4">
+                                             <TabsTrigger value="generate">Generiraj Sliku</TabsTrigger>
+                                             <TabsTrigger value="upload">Upload Sliku</TabsTrigger>
+                                           </TabsList>
+                                           
+                                           <TabsContent value="generate" className="space-y-4">
+                                             <div>
+                                               <Label>Opis avatar slike</Label>
+                                               <Textarea
+                                                 value={imagePrompt}
+                                                 onChange={(e) => setImagePrompt(e.target.value)}
+                                                 placeholder="Npr. Profesionalni poslovni avatar, muška osoba, formalna odjeća, studio pozadina..."
+                                                 className="glass border-glass-border min-h-20"
+                                               />
+                                             </div>
+                                             <Button
+                                               onClick={generateAvatarImage}
+                                               disabled={isGeneratingImage}
+                                               className="w-full glass-button"
+                                             >
+                                               {isGeneratingImage ? (
+                                                 <>
+                                                   <Sparkles className="w-4 h-4 mr-2 animate-spin" />
+                                                   Generiranje...
+                                                 </>
+                                               ) : (
+                                                 <>
+                                                   <Sparkles className="w-4 h-4 mr-2" />
+                                                   Generiraj AI Sliku
+                                                 </>
+                                               )}
+                                             </Button>
+                                           </TabsContent>
+                                           
+                                           <TabsContent value="upload" className="space-y-4">
+                                             <div>
+                                               <Label>Upload sliku avatara</Label>
+                                               <Input
+                                                 type="file"
+                                                 accept="image/*"
+                                                 onChange={handleAvatarImageUpload}
+                                                 className="glass border-glass-border"
+                                               />
+                                               <p className="text-sm text-muted-foreground mt-2">
+                                                 Podržani formati: JPG, PNG, WEBP (max 10MB)
+                                               </p>
+                                             </div>
+                                           </TabsContent>
+                                         </Tabs>
+                                         
+                                         {selectedAvatarImage && (
+                                           <div className="mt-4 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                                             <div className="flex items-center gap-2 mb-2">
+                                               <Image className="w-4 h-4 text-green-600" />
+                                               <span className="text-sm font-medium text-green-800 dark:text-green-200">Slika odabrana</span>
+                                             </div>
+                                             <img 
+                                               src={selectedAvatarImage} 
+                                               alt="Selected avatar" 
+                                               className="w-full h-32 object-cover rounded border"
+                                             />
+                                           </div>
+                                         )}
+                                       </div>
+                                     </div>
 
                                     {/* Video Generation Progress */}
                                     {isCreatingVideo && (
@@ -1113,18 +1241,19 @@ export default function CreateAvatar() {
                                       </div>
                                     )}
 
-                                    {/* Action Buttons */}
-                                    <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-glass-border">
-                                      {!isCreatingVideo && !createdAvatarVideo && (
-                                        <Button
-                                          onClick={generateAvatarVideo}
-                                          className="flex-1 glass-button bg-gradient-to-r from-primary to-accent text-white font-semibold py-3"
-                                          size="lg"
-                                        >
-                                          <Video className="w-5 h-5 mr-2" />
-                                          Generiši Avatar Video
-                                        </Button>
-                                      )}
+                                     {/* Action Buttons */}
+                                     <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-glass-border">
+                                       {!isCreatingVideo && !createdAvatarVideo && (
+                                         <Button
+                                           onClick={generateAvatarVideo}
+                                           disabled={!selectedAvatarImage}
+                                           className="flex-1 glass-button bg-gradient-to-r from-primary to-accent text-white font-semibold py-3"
+                                           size="lg"
+                                         >
+                                           <Video className="w-5 h-5 mr-2" />
+                                           {selectedAvatarImage ? 'Generiši Avatar Video' : 'Odaberite sliku prvo'}
+                                         </Button>
+                                       )}
 
                                       {createdAvatarVideo && (
                                         <>
