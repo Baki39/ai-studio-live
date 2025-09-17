@@ -239,7 +239,7 @@ export default function CreateAvatar() {
       voiceId = voiceConfig.customVoiceId;
     } else if (voiceConfig.voiceId === "bosanac-sarajlija") {
       // Replace with your actual ElevenLabs voice ID
-      voiceId = "YOUR_BOSANAC_VOICE_ID"; // User needs to provide this
+      voiceId = "lAB2lrSx4vWAj0r5TaOa"; // Bosanac/Sarajlija custom voice
     }
     
     if (!voiceId) {
