@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,19 +57,12 @@ serve(async (req) => {
       throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
     }
 
-    // Convert audio to base64 using chunk processing to avoid stack overflow
+    // Convert audio to base64 using proper encoding
     const arrayBuffer = await response.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
-    
-    // Process in chunks to avoid "Maximum call stack size exceeded"
-    const chunkSize = 32768; // 32KB chunks
-    let base64Audio = '';
-    
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.slice(i, i + chunkSize);
-      const chunkString = String.fromCharCode.apply(null, Array.from(chunk));
-      base64Audio += btoa(chunkString);
-    }
+
+    // Properly encode entire buffer to base64 (handles any length)
+    const base64Audio = base64Encode(uint8Array);
 
     console.log('Voice generated successfully');
 
