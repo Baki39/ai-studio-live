@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import RunwayML, { TaskFailedError } from 'npm:@runwayml/sdk'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,45 +32,33 @@ serve(async (req) => {
       hasImage: !!avatar.image
     })
 
-    // Prepare Runway request payload
-    const runwayPayload = {
-      model: "gen-3a-turbo",
-      prompt: `Create a realistic avatar video of a ${avatar.gender} person speaking. The person should have natural facial expressions, lip sync with the audio, and professional appearance. Duration: ${duration} seconds. Include subtle movements like blinking, head nods, and natural gestures.`,
-      image: avatar.image,
-      audio: audioUrl,
-      duration: duration,
-      aspect_ratio: "16:9",
-      watermark: false
-    }
-
-    // Call Runway API
-    const runwayResponse = await fetch('https://api.dev.runwayml.com/v1/image_to_video', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${runwayApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(runwayPayload)
+    // Initialize Runway client with API key
+    const client = new RunwayML({
+      apiKey: runwayApiKey,
     })
 
-    if (!runwayResponse.ok) {
-      const errorText = await runwayResponse.text()
-      console.error('Runway API error:', errorText)
-      throw new Error(`Runway API error: ${runwayResponse.status} - ${errorText}`)
-    }
+    // Create image-to-video task using SDK
+    const task = await client.imageToVideo
+      .create({
+        model: 'gen4_turbo',
+        promptImage: avatar.image,
+        promptText: `Create a realistic avatar video of a ${avatar.gender} person speaking. The person should have natural facial expressions, lip sync with the audio, and professional appearance. Duration: ${duration} seconds. Include subtle movements like blinking, head nods, and natural gestures.`,
+        ratio: '16:9',
+        duration: duration || 5,
+      })
+      .waitForTaskOutput()
 
-    const runwayResult = await runwayResponse.json()
-    console.log('Runway video generation result:', runwayResult)
+    console.log('Runway video generation result:', task)
 
     // Return the generated video URL
     return new Response(
       JSON.stringify({ 
-        videoUrl: runwayResult.video_url || runwayResult.url,
+        videoUrl: task.output?.url,
         duration: duration,
         emotions: emotions,
         movements: movements,
         status: 'completed',
-        runway_id: runwayResult.id
+        runway_id: task.id
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -77,6 +66,18 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error('Error generating avatar video:', error)
+    
+    if (error instanceof TaskFailedError) {
+      console.error('The video failed to generate:', error.taskDetails)
+      return new Response(
+        JSON.stringify({ error: 'Video generation failed', details: error.taskDetails }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+    
     return new Response(
       JSON.stringify({ error: error.message }),
       {
