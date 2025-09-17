@@ -201,28 +201,88 @@ export default function CreateAvatar() {
   };
 
   const extractAvatarText = (script: string, avatarIndex: number): string => {
-    const lines = script.split('\n');
-    const avatarPattern = new RegExp(`Avatar ${avatarIndex + 1}:`, 'i');
-    const result: string[] = [];
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (avatarPattern.test(line)) {
-        // Extract text after "Avatar X:"
-        const text = line.replace(avatarPattern, '').trim();
-        if (text) result.push(text);
-        
-        // Continue reading until next avatar or end
+    if (!script?.trim()) return "";
+
+    const lines = script.replace(/\r\n?/g, "\n").split("\n");
+
+    // Helper: try to parse a speaker label from a line
+    const parseSpeakerFromLine = (line: string): { label: string; content: string } | null => {
+      // Allow formats like: "Avatar 1:", "**Avatar 1:**", "Avatar 1 -", "AVATAR 2:", "Amir:", "Hana —"
+      const match = line.match(/^\s*(?:\*\*|__)?\s*([A-Za-zČĆŠĐŽčćšđž][\wČĆŠĐŽčćšđž'’\- ]{0,30}|Avatar\s*\d+)\s*[:\-–—)]\s*(.*)$/i);
+      if (!match) return null;
+      const label = match[1].trim();
+      const content = (match[2] || "").trim();
+      return { label, content };
+    };
+
+    type Block = { speaker: string; text: string[] };
+    const blocks: Block[] = [];
+    const speakersOrder: string[] = [];
+
+    let i = 0;
+    while (i < lines.length) {
+      const raw = lines[i].trim();
+      const parsed = parseSpeakerFromLine(raw);
+
+      if (parsed) {
+        const speaker = parsed.label;
+        if (!speakersOrder.includes(speaker)) speakersOrder.push(speaker);
+
+        const textLines: string[] = [];
+        if (parsed.content) textLines.push(parsed.content);
+
         let j = i + 1;
-        while (j < lines.length && !lines[j].match(/Avatar \d+:/i)) {
-          const nextLine = lines[j].trim();
-          if (nextLine) result.push(nextLine);
+        // Collect until next line that starts with a speaker label
+        while (j < lines.length) {
+          const next = lines[j].trim();
+          if (parseSpeakerFromLine(next)) break;
+          if (next) textLines.push(next);
           j++;
         }
+
+        blocks.push({ speaker, text: textLines });
+        i = j; // continue from next potential speaker
+        continue;
+      }
+
+      i++;
+    }
+
+    // If we could not detect any blocks with labels, fallback: give all text to the first avatar
+    if (blocks.length === 0) {
+      return avatarIndex === 0 ? lines.join(" ").trim() : "";
+    }
+
+    // Map speakers to avatar indices
+    const getAvatarIdxForSpeaker = (speaker: string): number => {
+      const avatarNum = speaker.match(/Avatar\s*(\d+)/i);
+      if (avatarNum) {
+        return Math.max(0, parseInt(avatarNum[1], 10) - 1);
+      }
+      // Non "Avatar X" label -> assign by order of first appearance
+      const pos = speakersOrder.indexOf(speaker);
+      return pos >= 0 ? pos : -1;
+    };
+
+    // Aggregate text for the requested avatar
+    const collected: string[] = [];
+    for (const b of blocks) {
+      const idx = getAvatarIdxForSpeaker(b.speaker);
+      if (idx === avatarIndex) {
+        collected.push(b.text.join(" "));
       }
     }
-    
-    return result.join(' ').trim();
+
+    // If still empty and there are exactly 2 speakers, try alternating fallback
+    if (collected.length === 0 && speakersOrder.length === 2) {
+      const alt: string[] = [];
+      blocks.forEach((b, bi) => {
+        alt.push(bi % 2 === avatarIndex ? b.text.join(" ") : "");
+      });
+      return alt.filter(Boolean).join(" ").trim();
+    }
+
+    return collected.join(" ").trim();
   };
 
   const generateVoiceForAvatar = async (avatarIndex: number) => {
