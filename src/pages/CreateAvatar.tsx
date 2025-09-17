@@ -207,19 +207,26 @@ export default function CreateAvatar() {
 
     // Helper: try to parse a speaker label from a line
     const parseSpeakerFromLine = (line: string): { label: string; content: string } | null => {
+      // Normalize and support bold markers both before and after the label/punctuation
+      const l = line.replace(/\u00A0/g, ' ').trim();
+
       // 1) Prefer explicit "Avatar N" labels (supports **bold**, (brackets), and optional punctuation or EOL)
-      const avatarMatch = line.match(/^\s*(?:\*\*|__)?\s*(?:[\[\(])?\s*(Avatar\s*\d+)\s*(?:[\]\)])?\s*(?::|[-–—])?\s*(.*)$/i);
+      //    Also allow closing **/__ immediately after punctuation
+      const avatarMatch = l.match(/^\s*(?:\*\*|__)?\s*(?:[\[\(])?\s*(Avatar\s*\d+)\s*(?:[\]\)])?\s*(?::|[-–—])?\s*(?:\*\*|__)?\s*(.*)$/i);
       if (avatarMatch) {
         const label = avatarMatch[1].trim();
-        const content = (avatarMatch[2] || "").trim();
+        let content = (avatarMatch[2] || "").trim();
+        // Strip stray bold markers around content
+        content = content.replace(/^(?:\*\*|__)\s*/, '').replace(/\s*(?:\*\*|__)$/, '').trim();
         return { label, content };
       }
 
-      // 2) Named speakers (Amir:, Hana— ...) require punctuation to avoid false positives
-      const nameMatch = line.match(/^\s*(?:\*\*|__)?\s*([A-Za-zČĆŠĐŽčćšđž][\wČĆŠĐŽčćšđž'’\- ]{0,30})\s*[:\-–—]\s*(.*)$/i);
+      // 2) Named speakers (Amir:, Hana— ...) require punctuation; allow closing **/__ after punctuation
+      const nameMatch = l.match(/^\s*(?:\*\*|__)?\s*([A-Za-zČĆŠĐŽčćšđž][\wČĆŠĐŽčćšđž'’\- ]{0,30})\s*[:\-–—]\s*(?:\*\*|__)?\s*(.*)$/i);
       if (nameMatch) {
         const label = nameMatch[1].trim();
-        const content = (nameMatch[2] || "").trim();
+        let content = (nameMatch[2] || "").trim();
+        content = content.replace(/^(?:\*\*|__)\s*/, '').replace(/\s*(?:\*\*|__)$/, '').trim();
         return { label, content };
       }
 
