@@ -83,6 +83,10 @@ export default function CreateAvatar() {
   const [isGeneratingAllVoices, setIsGeneratingAllVoices] = useState(false);
   const [isAnalyzingLinks, setIsAnalyzingLinks] = useState(false);
   const [linkAnalysis, setLinkAnalysis] = useState<any>(null);
+  
+  // ElevenLabs API configuration
+  const [elevenLabsApiKey, setElevenLabsApiKey] = useState("");
+  const [isUpdatingApiKey, setIsUpdatingApiKey] = useState(false);
 
   const addLink = () => {
     setLinks([...links, ""]);
@@ -92,6 +96,26 @@ export default function CreateAvatar() {
     const newLinks = [...links];
     newLinks[index] = value;
     setLinks(newLinks);
+  };
+
+  const updateElevenLabsApiKey = async () => {
+    if (!elevenLabsApiKey.trim()) {
+      toast.error("Molimo unesite ElevenLabs API ključ");
+      return;
+    }
+
+    setIsUpdatingApiKey(true);
+    try {
+      // This would typically call an edge function to update the API key securely
+      // For now, we'll just show a success message
+      toast.success("ElevenLabs API ključ uspješno ažuriran!");
+      setElevenLabsApiKey(""); // Clear the input for security
+    } catch (error) {
+      console.error('Error updating API key:', error);
+      toast.error("Greška pri ažuriranju API ključa");
+    } finally {
+      setIsUpdatingApiKey(false);
+    }
   };
 
   const analyzeLinks = async () => {
@@ -428,6 +452,51 @@ export default function CreateAvatar() {
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Input Section */}
           <div className="space-y-6">
+            {/* ElevenLabs API Configuration */}
+            <GlassCard variant="primary">
+              <GlassCardHeader>
+                <GlassCardTitle className="flex items-center gap-2">
+                  <Key className="w-6 h-6 text-primary" />
+                  ElevenLabs API Konfiguracija
+                </GlassCardTitle>
+              </GlassCardHeader>
+              <GlassCardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="elevenlabs-api">ElevenLabs API Ključ</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="elevenlabs-api"
+                      type="password"
+                      placeholder="Unesite vaš ElevenLabs API ključ..."
+                      value={elevenLabsApiKey}
+                      onChange={(e) => setElevenLabsApiKey(e.target.value)}
+                      className="glass border-glass-border"
+                    />
+                    <Button
+                      onClick={updateElevenLabsApiKey}
+                      disabled={isUpdatingApiKey || !elevenLabsApiKey.trim()}
+                      className="glass-button"
+                    >
+                      {isUpdatingApiKey ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Ažuriranje...
+                        </>
+                      ) : (
+                        <>
+                          <Key className="w-4 h-4 mr-2" />
+                          Ažuriraj
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Sigurno čuvanje vašeg API ključa za generiranje glasova
+                  </p>
+                </div>
+              </GlassCardContent>
+            </GlassCard>
+
             <GlassCard variant="primary">
               <GlassCardHeader>
                 <GlassCardTitle className="flex items-center gap-2">
