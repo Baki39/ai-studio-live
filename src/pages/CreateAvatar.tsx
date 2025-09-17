@@ -81,6 +81,8 @@ export default function CreateAvatar() {
   const [generatedVoices, setGeneratedVoices] = useState<Array<string | null>>([]);
   const [isGeneratingVoices, setIsGeneratingVoices] = useState<Array<boolean>>([]);
   const [isGeneratingAllVoices, setIsGeneratingAllVoices] = useState(false);
+  const [isAnalyzingLinks, setIsAnalyzingLinks] = useState(false);
+  const [linkAnalysis, setLinkAnalysis] = useState<any>(null);
 
   const addLink = () => {
     setLinks([...links, ""]);
@@ -92,9 +94,63 @@ export default function CreateAvatar() {
     setLinks(newLinks);
   };
 
+  const analyzeLinks = async () => {
+    const validLinks = links.filter(link => link.trim());
+    
+    if (validLinks.length === 0) {
+      toast.error("Molimo dodajte barem jedan link");
+      return;
+    }
+
+    setIsAnalyzingLinks(true);
+    toast.success("AI analizira linkove...");
+
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-links', {
+        body: {
+          links: validLinks,
+          concept,
+          duration
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Greška pri analizi linkova');
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      setLinkAnalysis(data.analysis);
+      
+      // Auto-update concept if it was empty or if user wants enhancement
+      if (!concept.trim() && data.analysis.enhancedConcept) {
+        setConcept(data.analysis.enhancedConcept);
+      }
+      
+      setIsAnalyzingLinks(false);
+      toast.success("Linkovi uspješno analizirani!");
+      
+    } catch (error) {
+      console.error('Greška:', error);
+      setIsAnalyzingLinks(false);
+      toast.error(error.message || "Greška pri analizi linkova");
+    }
+  };
+
   const generateScript = async () => {
-    if (!concept.trim()) {
-      toast.error("Molimo unesite koncept podcasta");
+    // Auto-analyze links if we have links but no analysis yet
+    const validLinks = links.filter(link => link.trim());
+    let finalConcept = concept;
+    
+    if (validLinks.length > 0 && !linkAnalysis) {
+      await analyzeLinks();
+      finalConcept = linkAnalysis?.enhancedConcept || concept;
+    }
+    
+    if (!finalConcept.trim() && !linkAnalysis) {
+      toast.error("Molimo unesite koncept podcasta ili dodajte linkove za analizu");
       return;
     }
 
@@ -104,8 +160,8 @@ export default function CreateAvatar() {
     try {
       const { data, error } = await supabase.functions.invoke('generate-script', {
         body: {
-          concept,
-          links: links.filter(link => link.trim()),
+          concept: finalConcept || linkAnalysis?.enhancedConcept,
+          links: validLinks,
           scriptAvatarCount
         }
       });
@@ -413,17 +469,83 @@ export default function CreateAvatar() {
                         </div>
                       </div>
                     ))}
-                    <Button
-                      onClick={addLink}
-                      variant="outline"
-                      size="sm"
-                      className="glass-button"
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Dodaj link
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={addLink}
+                        variant="outline"
+                        size="sm"
+                        className="glass-button"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Dodaj link
+                      </Button>
+                      
+                      {links.some(link => link.trim()) && (
+                        <Button
+                          onClick={analyzeLinks}
+                          disabled={isAnalyzingLinks}
+                          size="sm"
+                          className="glass-button"
+                        >
+                          {isAnalyzingLinks ? (
+                            <>
+                              <Sparkles className="w-4 h-4 mr-2 animate-spin" />
+                              Analiziranje...
+                            </>
+                          ) : (
+                            <>
+                              <Brain className="w-4 h-4 mr-2" />
+                              Analiziraj AI
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
+
+                {linkAnalysis && (
+                  <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                    <h4 className="font-semibold text-primary mb-2 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      AI Analiza Linkova
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      {linkAnalysis.enhancedConcept && (
+                        <div>
+                          <span className="font-medium">Poboljšani koncept:</span>
+                          <p className="text-muted-foreground mt-1">{linkAnalysis.enhancedConcept}</p>
+                        </div>
+                      )}
+                      {linkAnalysis.mainTopics?.length > 0 && (
+                        <div>
+                          <span className="font-medium">Glavne teme:</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {linkAnalysis.mainTopics.map((topic: string, index: number) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                {topic}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {linkAnalysis.style && (
+                        <div>
+                          <span className="font-medium">Stil:</span>
+                          <span className="text-muted-foreground ml-2">{linkAnalysis.style}</span>
+                        </div>
+                      )}
+                      <Button
+                        onClick={() => setConcept(linkAnalysis.enhancedConcept)}
+                        size="sm"
+                        variant="outline"
+                        className="mt-2"
+                      >
+                        Koristi ovaj koncept
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <Label>Trajanje live podcast-a</Label>

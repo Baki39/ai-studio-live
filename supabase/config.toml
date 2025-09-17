@@ -1,5 +1,8 @@
 project_id = "lkghvrwekhtfegrwmoft"
 
+[functions.analyze-links]
+verify_jwt = false
+
 [functions.generate-script]
 verify_jwt = false
 
