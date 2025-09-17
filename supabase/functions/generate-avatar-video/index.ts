@@ -48,7 +48,7 @@ serve(async (req) => {
         model: 'gen4_turbo',
         promptImage: avatar.image,
         promptText: `Create a realistic avatar video of a ${avatar.gender} person speaking. The person should have natural facial expressions, lip sync with the audio, and professional appearance. Include subtle movements like blinking, head nods, and natural gestures.`,
-        ratio: '16:9',
+        ratio: '1280:720',
         duration: validDuration,
       })
       .waitForTaskOutput()
