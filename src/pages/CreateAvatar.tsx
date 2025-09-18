@@ -34,7 +34,9 @@ import {
   Camera,
   Smile,
   Heart,
-  Zap
+  Zap,
+  Minimize2,
+  Maximize2
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
@@ -510,6 +512,7 @@ export default function CreateAvatar() {
   const [isCreatingVideo, setIsCreatingVideo] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [createdAvatarVideo, setCreatedAvatarVideo] = useState<string | null>(null);
+  const [isDialogMinimized, setIsDialogMinimized] = useState(false);
   
   // Image generation/upload states
   const [selectedAvatarImage, setSelectedAvatarImage] = useState<string | null>(null);
@@ -601,6 +604,22 @@ export default function CreateAvatar() {
       
       console.log('Using duration for video generation:', finalDuration, 'seconds');
       
+      // Get audio data for better voice integration
+      let audioData = null;
+      if (generatedVoice) {
+        try {
+          const audioResponse = await fetch(generatedVoice);
+          const audioBlob = await audioResponse.blob();
+          const reader = new FileReader();
+          audioData = await new Promise((resolve) => {
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(audioBlob);
+          });
+        } catch (error) {
+          console.error('Error processing audio for video:', error);
+        }
+      }
+
       // Create video generation request
       const response = await supabase.functions.invoke('generate-avatar-video', {
         body: {
@@ -610,6 +629,8 @@ export default function CreateAvatar() {
             voice: voiceConfig?.voiceId || 'default'
           },
           audioUrl: generatedVoice,
+          audioData: audioData, // Pass audio data for better lip-sync
+          voiceConfig: voiceConfig, // Pass voice configuration
           duration: finalDuration, // Already in seconds
           emotions: ['neutral', 'smile', 'talking', 'laugh', 'nod'],
           movements: ['head_nod', 'slight_turn', 'blink', 'mouth_sync']
@@ -1052,11 +1073,21 @@ export default function CreateAvatar() {
                                     Kreiraj Avatar
                                   </Button>
                                 </DialogTrigger>
-                                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto glass border-glass-border">
+                                <DialogContent className={`max-w-4xl ${isDialogMinimized ? 'max-h-[40vh]' : 'max-h-[90vh]'} overflow-y-auto glass border-glass-border`}>
                                   <DialogHeader>
-                                    <DialogTitle className="text-2xl font-bold text-center bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                                      🎭 Kreiranje Avatara sa Video Animacijom
-                                    </DialogTitle>
+                                    <div className="flex items-center justify-between">
+                                      <DialogTitle className="text-2xl font-bold text-center bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                                        🎭 Kreiranje Avatara sa Video Animacijom
+                                      </DialogTitle>
+                                      <Button
+                                        onClick={() => setIsDialogMinimized(!isDialogMinimized)}
+                                        variant="ghost"
+                                        size="sm"
+                                        className="glass-button"
+                                      >
+                                        {isDialogMinimized ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
+                                      </Button>
+                                    </div>
                                   </DialogHeader>
                                   
                                   <div className="space-y-6 p-2">
