@@ -88,8 +88,10 @@ export default function PodcastLive() {
     if (avatar1VideoRef.current) {
       if (avatar1VideoPlaying) {
         avatar1VideoRef.current.pause();
+        avatar1VideoRef.current.muted = true;
       } else {
-        avatar1VideoRef.current.play();
+        avatar1VideoRef.current.muted = false;
+        avatar1VideoRef.current.play().catch(console.error);
       }
       setAvatar1VideoPlaying(!avatar1VideoPlaying);
     }
@@ -99,8 +101,10 @@ export default function PodcastLive() {
     if (avatar2VideoRef.current) {
       if (avatar2VideoPlaying) {
         avatar2VideoRef.current.pause();
+        avatar2VideoRef.current.muted = true;
       } else {
-        avatar2VideoRef.current.play();
+        avatar2VideoRef.current.muted = false;
+        avatar2VideoRef.current.play().catch(console.error);
       }
       setAvatar2VideoPlaying(!avatar2VideoPlaying);
     }
@@ -634,6 +638,7 @@ export default function PodcastLive() {
                         autoPlay 
                         loop 
                         muted
+                        playsInline
                       />
                     ) : avatars[0]?.image && (
                       <img 
@@ -755,6 +760,7 @@ export default function PodcastLive() {
                         autoPlay 
                         loop 
                         muted
+                        playsInline
                       />
                     ) : avatars[1]?.image && (
                       <img 
