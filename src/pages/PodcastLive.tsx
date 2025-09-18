@@ -34,13 +34,14 @@ import {
   Activity,
   Focus,
   ScanLine,
-  BarChart3
+  BarChart3,
+  Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function PodcastLive() {
   // Get avatar context
-  const { selectedAvatarsForLive, generatedScript, generatedVoice } = useAvatarContext();
+  const { selectedAvatarsForLive, generatedScript, generatedVoice, removeAvatarFromLive } = useAvatarContext();
   
   // Auto-activate avatars when they exist
   const [hasAutoActivated, setHasAutoActivated] = useState(false);
@@ -72,9 +73,54 @@ export default function PodcastLive() {
   const [avatar2CameraActive, setAvatar2CameraActive] = useState(false);
   const [focusMode, setFocusMode] = useState<'auto' | 'manual'>('auto');
   
+  // Video Control States
+  const [avatar1VideoPlaying, setAvatar1VideoPlaying] = useState(true);
+  const [avatar2VideoPlaying, setAvatar2VideoPlaying] = useState(true);
+  const avatar1VideoRef = useRef<HTMLVideoElement>(null);
+  const avatar2VideoRef = useRef<HTMLVideoElement>(null);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+
+  // Video control functions
+  const toggleAvatar1Video = () => {
+    if (avatar1VideoRef.current) {
+      if (avatar1VideoPlaying) {
+        avatar1VideoRef.current.pause();
+      } else {
+        avatar1VideoRef.current.play();
+      }
+      setAvatar1VideoPlaying(!avatar1VideoPlaying);
+    }
+  };
+
+  const toggleAvatar2Video = () => {
+    if (avatar2VideoRef.current) {
+      if (avatar2VideoPlaying) {
+        avatar2VideoRef.current.pause();
+      } else {
+        avatar2VideoRef.current.play();
+      }
+      setAvatar2VideoPlaying(!avatar2VideoPlaying);
+    }
+  };
+
+  const deleteAvatar1Video = () => {
+    if (removeAvatarFromLive && selectedAvatarsForLive[0]?.id) {
+      removeAvatarFromLive(selectedAvatarsForLive[0].id);
+      setAvatar1CameraActive(false);
+      toast.success("Avatar 1 video obrisan!");
+    }
+  };
+
+  const deleteAvatar2Video = () => {
+    if (removeAvatarFromLive && selectedAvatarsForLive[1]?.id) {
+      removeAvatarFromLive(selectedAvatarsForLive[1].id);
+      setAvatar2CameraActive(false);
+      toast.success("Avatar 2 video obrisan!");
+    }
+  };
 
   // Dynamic avatars from context with fallback to default ones
   const defaultAvatars = [
@@ -578,30 +624,35 @@ export default function PodcastLive() {
             </GlassCardHeader>
             <GlassCardContent>
               <div className="aspect-video bg-gradient-to-br from-secondary/10 to-accent/10 rounded-lg flex items-center justify-center relative border border-secondary/20">
-                {avatarsActive && avatar1CameraActive ? (
+                {avatars[0]?.video || avatars[0]?.image ? (
                   <div className="w-full h-full cyber-gradient-secondary rounded-lg flex items-center justify-center relative">
                     {avatars[0]?.video ? (
                       <video 
+                        ref={avatar1VideoRef}
                         src={avatars[0].video} 
                         className="w-full h-full object-cover rounded-lg"
                         autoPlay 
                         loop 
                         muted
                       />
-                    ) : avatars[0]?.image ? (
+                    ) : avatars[0]?.image && (
                       <img 
                         src={avatars[0].image} 
                         alt={avatars[0].name}
                         className="w-full h-full object-cover rounded-lg"
                       />
-                    ) : (
-                      <div className="text-center text-white">
-                        <Users className="w-8 h-8 mx-auto mb-2" />
-                        <p className="text-sm font-medium">{avatars[0]?.name || 'Avatar 1'}</p>
-                        <p className="text-xs opacity-80">Profesionalni Govornik</p>
-                      </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-secondary/30 to-transparent rounded-lg"></div>
+                    
+                    {/* Delete Video Icon */}
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      className="absolute top-2 right-2 w-6 h-6 rounded-full"
+                      onClick={deleteAvatar1Video}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
                   </div>
                 ) : (
                   <div className="text-center">
@@ -611,7 +662,7 @@ export default function PodcastLive() {
                 )}
                 
                 {currentSpeaker === 'avatar1' && avatarsActive && avatar1CameraActive && (
-                  <div className="absolute top-2 right-2 flex items-center gap-1">
+                  <div className="absolute top-2 left-2 flex items-center gap-1">
                     <div className="w-3 h-3 bg-secondary rounded-full animate-pulse"></div>
                     <Badge variant="secondary" className="text-xs">SPEAKING</Badge>
                   </div>
@@ -667,9 +718,9 @@ export default function PodcastLive() {
                     size="sm"
                     variant="outline"
                     className="glass-button"
-                    onClick={() => toast.info("Pause Marko")}
+                    onClick={toggleAvatar1Video}
                   >
-                    <Pause className="w-3 h-3" />
+                    {avatar1VideoPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                   </Button>
                 </div>
               </div>
@@ -694,30 +745,35 @@ export default function PodcastLive() {
             </GlassCardHeader>
             <GlassCardContent>
               <div className="aspect-video bg-gradient-to-br from-accent/10 to-primary/10 rounded-lg flex items-center justify-center relative border border-accent/20">
-                {avatarsActive && avatar2CameraActive ? (
+                {avatars[1]?.video || avatars[1]?.image ? (
                   <div className="w-full h-full cyber-gradient-accent rounded-lg flex items-center justify-center relative">
                     {avatars[1]?.video ? (
                       <video 
+                        ref={avatar2VideoRef}
                         src={avatars[1].video} 
                         className="w-full h-full object-cover rounded-lg"
                         autoPlay 
                         loop 
                         muted
                       />
-                    ) : avatars[1]?.image ? (
+                    ) : avatars[1]?.image && (
                       <img 
                         src={avatars[1].image} 
                         alt={avatars[1].name}
                         className="w-full h-full object-cover rounded-lg"
                       />
-                    ) : (
-                      <div className="text-center text-white">
-                        <Users className="w-8 h-8 mx-auto mb-2" />
-                        <p className="text-sm font-medium">{avatars[1]?.name || 'Avatar 2'}</p>
-                        <p className="text-xs opacity-80">Prijateljski Govornik</p>
-                      </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-accent/30 to-transparent rounded-lg"></div>
+                    
+                    {/* Delete Video Icon */}
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      className="absolute top-2 right-2 w-6 h-6 rounded-full"
+                      onClick={deleteAvatar2Video}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
                   </div>
                 ) : (
                   <div className="text-center">
@@ -727,7 +783,7 @@ export default function PodcastLive() {
                 )}
                 
                 {currentSpeaker === 'avatar2' && avatarsActive && avatar2CameraActive && (
-                  <div className="absolute top-2 right-2 flex items-center gap-1">
+                  <div className="absolute top-2 left-2 flex items-center gap-1">
                     <div className="w-3 h-3 bg-accent rounded-full animate-pulse"></div>
                     <Badge variant="secondary" className="text-xs bg-accent text-accent-foreground">SPEAKING</Badge>
                   </div>
@@ -783,9 +839,9 @@ export default function PodcastLive() {
                     size="sm"
                     variant="outline"
                     className="glass-button"
-                    onClick={() => toast.info("Pause Ana")}
+                    onClick={toggleAvatar2Video}
                   >
-                    <Pause className="w-3 h-3" />
+                    {avatar2VideoPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                   </Button>
                 </div>
               </div>
