@@ -181,9 +181,9 @@ export default function PodcastLive() {
     }
   }, [selectedAvatarsForLive.length, hasAutoActivated]);
 
-  // AI Audio Analysis and Scene Control
+  // AI Audio Analysis and Scene Control - Only during live recording
   useEffect(() => {
-    if (isLive && aiSceneControl) {
+    if (isLive && isRecording && aiSceneControl) {
       const interval = setInterval(() => {
         // Simulate voice detection and auto scene switching
         if (voiceDetectionActive) {
@@ -206,7 +206,7 @@ export default function PodcastLive() {
       
       return () => clearInterval(interval);
     }
-  }, [isLive, aiSceneControl, audioSensitivity, sceneTransitionSpeed, voiceDetectionActive, avatarsActive, currentSpeaker]);
+  }, [isLive, isRecording, aiSceneControl, audioSensitivity, sceneTransitionSpeed, voiceDetectionActive, avatarsActive, currentSpeaker]);
 
   const startLive = async () => {
     try {
