@@ -160,30 +160,43 @@ export default function PodcastLive() {
 
   const startLive = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: true 
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      // Instead of showing user's camera, show avatar videos
+      if (selectedAvatarsForLive.length > 0) {
+        const firstAvatarWithVideo = selectedAvatarsForLive.find(avatar => avatar.video);
+        
+        if (firstAvatarWithVideo && videoRef.current) {
+          videoRef.current.src = firstAvatarWithVideo.video;
+          videoRef.current.loop = true;
+        }
+        
+        // Initialize AI Audio Analysis for voice only (no camera stream needed)
+        if (aiSceneControl) {
+          try {
+            const audioStream = await navigator.mediaDevices.getUserMedia({ 
+              audio: true, 
+              video: false 
+            });
+            
+            audioContextRef.current = new AudioContext();
+            analyserRef.current = audioContextRef.current.createAnalyser();
+            const source = audioContextRef.current.createMediaStreamSource(audioStream);
+            source.connect(analyserRef.current);
+            setVoiceDetectionActive(true);
+          } catch (audioError) {
+            console.log("Audio analysis not available, continuing without it");
+          }
+        }
+        
+        setIsLive(true);
+        setIsRecording(true);
+        setAvatarsActive(true);
+        setCurrentSpeaker('avatar1');
+        toast.success("Live podcast počinje sa avatar video!");
+      } else {
+        toast.error("Nema generisanih avatara sa videom!");
       }
-      
-      // Initialize AI Audio Analysis
-      if (aiSceneControl) {
-        audioContextRef.current = new AudioContext();
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        const source = audioContextRef.current.createMediaStreamSource(stream);
-        source.connect(analyserRef.current);
-        setVoiceDetectionActive(true);
-      }
-      
-      setIsLive(true);
-      setIsRecording(true);
-      setHostCameraActive(true);
-      toast.success("Live podcast počinje! AI Scene Control aktiviran!");
     } catch (error) {
-      toast.error("Greška pri pristupanju kameri/mikrofonu");
+      toast.error("Greška pri pokretanju live podcasta");
     }
   };
 
@@ -226,17 +239,25 @@ export default function PodcastLive() {
     setAvatar1CameraActive(false);
     setAvatar2CameraActive(false);
     
+    // Stop avatar video and clear the large screen
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.src = '';
+      videoRef.current.load();
+    }
+    
+    // Stop audio stream if exists
     if (videoRef.current?.srcObject) {
       const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
       tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
     }
     
     if (audioContextRef.current) {
       audioContextRef.current.close();
     }
     
-    toast.success("Snimanje završeno! Priprema za export...");
-    // Show save dialog
+    toast.success("Snimanje završeno! Veliki ekran ugašen.");
   };
 
   return (
