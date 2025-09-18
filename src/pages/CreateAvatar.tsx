@@ -1418,6 +1418,184 @@ export default function CreateAvatar() {
                 </GlassCardContent>
               </GlassCard>
             )}
+
+            {/* Avatar Video Animation Creation Section - Always visible after script generation */}
+            {generatedScript && (
+              <GlassCard variant="accent">
+                <GlassCardHeader>
+                  <GlassCardTitle className="text-2xl font-bold text-center bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                    🎭 Kreiranje Avatara sa Video Animacijom
+                  </GlassCardTitle>
+                </GlassCardHeader>
+                
+                <GlassCardContent className="space-y-6">
+                  {/* Avatar Preview and Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <User className="w-5 h-5" />
+                        Avatar Informacije
+                      </h3>
+                      <div className="glass p-4 rounded-lg space-y-3">
+                        {Array.from({ length: parseInt(scriptAvatarCount) }, (_, index) => (
+                          <div key={index} className="border border-glass-border rounded-lg p-4 space-y-3">
+                            <div className="flex items-center gap-3">
+                              <Badge variant="secondary">Avatar {index + 1}</Badge>
+                              <Badge variant={index % 2 === 0 ? "default" : "secondary"}>
+                                {index % 2 === 0 ? selectedGender === 'male' ? '👨 Muški' : '👩 Ženski' : selectedGender === 'male' ? '👩 Ženski' : '👨 Muški'}
+                              </Badge>
+                            </div>
+                            {(selectedAvatarImage || avatarImagePreview) && (
+                              <img 
+                                src={selectedAvatarImage || avatarImagePreview || ""} 
+                                alt="Avatar preview" 
+                                className="w-full h-32 object-cover rounded-lg border border-glass-border"
+                              />
+                            )}
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              <p><strong>Glas:</strong> {avatarVoices[index]?.voiceId || 'Default'}</p>
+                              <p><strong>Tip:</strong> Profesionalni avatar</p>
+                              <p><strong>Trajanje videa:</strong> {duration.includes('3-5') ? '4' : duration.includes('5-8') ? '6' : '3'} minuta</p>
+                            </div>
+                            {generatedVoices[index] && (
+                              <div className="flex gap-1">
+                                <Button
+                                  onClick={() => createAvatarWithVoice(index)}
+                                  size="sm"
+                                  variant="default"
+                                  className="glass-button bg-primary text-primary-foreground hover:bg-primary/90"
+                                >
+                                  <UserCheck className="w-3 h-3 mr-1" />
+                                  Kreiraj Video
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <Video className="w-5 h-5" />
+                        Video Animacija
+                      </h3>
+                      <div className="glass p-4 rounded-lg space-y-3">
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <Smile className="w-4 h-4 text-primary" />
+                            <span>Emocije</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Camera className="w-4 h-4 text-accent" />
+                            <span>Pokreti</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Volume2 className="w-4 h-4 text-primary" />
+                            <span>Lip Sync</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Heart className="w-4 h-4 text-red-500" />
+                            <span>Animacije</span>
+                          </div>
+                        </div>
+                        <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-3 rounded-lg">
+                          <p className="text-sm text-center">
+                            ✨ AI će kreirati realnu avatar animaciju sa:<br/>
+                            • Sinhronizacija usta sa govorom<br/>
+                            • Prirodni pokreti i gestovi<br/>
+                            • Emocionalne ekspresije<br/>
+                            • Profesionalni kvalitet videa
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Image Generation/Upload Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Image className="w-5 h-5 text-blue-500" />
+                      Avatar Slika
+                    </h3>
+                    <div className="glass p-4 rounded-lg">
+                      <Tabs defaultValue="generate" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 mb-4">
+                          <TabsTrigger value="generate">Generiraj Sliku</TabsTrigger>
+                          <TabsTrigger value="upload">Upload Sliku</TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="generate" className="space-y-4">
+                          <div>
+                            <Label>Opis avatar slike</Label>
+                            <Textarea
+                              value={imagePrompt}
+                              onChange={(e) => setImagePrompt(e.target.value)}
+                              placeholder="Npr. Profesionalni poslovni avatar, muška osoba, formalna odjeća, studio pozadina..."
+                              className="glass border-glass-border min-h-20"
+                            />
+                          </div>
+                          <Button
+                            onClick={generateAvatarImage}
+                            disabled={isGeneratingImage || !imagePrompt.trim()}
+                            className="w-full glass-button"
+                          >
+                            {isGeneratingImage ? (
+                              <>
+                                <Sparkles className="w-4 h-4 mr-2 animate-spin" />
+                                Generiranje slike...
+                              </>
+                            ) : (
+                              <>
+                                <Image className="w-4 h-4 mr-2" />
+                                Generiraj Sliku
+                              </>
+                            )}
+                          </Button>
+                        </TabsContent>
+                        
+                        <TabsContent value="upload" className="space-y-4">
+                          <div>
+                            <Label>Upload avatar sliku</Label>
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleAvatarImageUpload}
+                              className="glass border-glass-border"
+                            />
+                          </div>
+                          {avatarImagePreview && (
+                            <img 
+                              src={avatarImagePreview} 
+                              alt="Avatar preview" 
+                              className="w-32 h-32 object-cover rounded-lg border border-glass-border"
+                            />
+                          )}
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </div>
+
+                  {/* AI Technology Info */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-blue-500 p-2 rounded-full">
+                        <Brain className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="text-sm">
+                        <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                          AI Avatar Tehnologija
+                        </h4>
+                        <p className="text-blue-700 dark:text-blue-300">
+                          Naš napredni AI sistem automatski sinhronizuje govor sa pokretima usta, 
+                          kreira prirodne gestove i emocionalne ekspresije za maksimalno realistične avatar videe.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </GlassCardContent>
+              </GlassCard>
+            )}
           </div>
         </div>
       </div>
