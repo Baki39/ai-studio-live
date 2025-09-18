@@ -702,31 +702,48 @@ export default function PodcastLive() {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-3 gap-1">
+                 <div className="grid grid-cols-3 gap-1">
                   <Button
                     size="sm"
-                    variant={avatar1CameraActive ? "default" : "outline"}
-                    className="glass-button"
-                    onClick={() => setAvatar1CameraActive(!avatar1CameraActive)}
-                  >
-                    {avatar1CameraActive ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="glass-button"
-                    onClick={() => toast.info("Mute Marko audio")}
-                  >
-                    <MicOff className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
+                    variant={avatar1VideoPlaying ? "default" : "outline"}
                     className="glass-button"
                     onClick={toggleAvatar1Video}
-                  >
-                    {avatar1VideoPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                  </Button>
+                   >
+                     {avatar1VideoPlaying ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                   </Button>
+                   <Button
+                     size="sm"
+                     variant="outline"
+                     className="glass-button"
+                     onClick={() => {
+                       if (avatar1VideoRef.current) {
+                         avatar1VideoRef.current.currentTime = 0;
+                         if (avatar1VideoPlaying) {
+                           avatar1VideoRef.current.play().catch(console.error);
+                         }
+                       }
+                     }}
+                   >
+                     <RotateCcw className="w-3 h-3" />
+                   </Button>
+                   <Button
+                     size="sm"
+                     variant={avatar1VideoPlaying ? "outline" : "default"}
+                     className="glass-button"
+                     onClick={() => {
+                       if (avatar1VideoRef.current) {
+                         if (avatar1VideoRef.current.muted) {
+                           avatar1VideoRef.current.muted = false;
+                           toast.info("Marko audio uključen");
+                         } else {
+                           avatar1VideoRef.current.muted = true;
+                           toast.info("Marko audio isključen");
+                         }
+                       }
+                     }}
+                   >
+                     <Volume2 className="w-3 h-3" />
+                   </Button>
                 </div>
               </div>
             </GlassCardContent>
@@ -824,30 +841,47 @@ export default function PodcastLive() {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-3 gap-1">
+                 <div className="grid grid-cols-3 gap-1">
                   <Button
                     size="sm"
-                    variant={avatar2CameraActive ? "default" : "outline"}
-                    className="glass-button"
-                    onClick={() => setAvatar2CameraActive(!avatar2CameraActive)}
-                  >
-                    {avatar2CameraActive ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="glass-button"
-                    onClick={() => toast.info("Mute Ana audio")}
-                  >
-                    <MicOff className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
+                    variant={avatar2VideoPlaying ? "default" : "outline"}
                     className="glass-button"
                     onClick={toggleAvatar2Video}
                   >
-                    {avatar2VideoPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                    {avatar2VideoPlaying ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="glass-button"
+                    onClick={() => {
+                      if (avatar2VideoRef.current) {
+                        avatar2VideoRef.current.currentTime = 0;
+                        if (avatar2VideoPlaying) {
+                          avatar2VideoRef.current.play().catch(console.error);
+                        }
+                      }
+                    }}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={avatar2VideoPlaying ? "outline" : "default"}
+                    className="glass-button"
+                    onClick={() => {
+                      if (avatar2VideoRef.current) {
+                        if (avatar2VideoRef.current.muted) {
+                          avatar2VideoRef.current.muted = false;
+                          toast.info("Ana audio uključen");
+                        } else {
+                          avatar2VideoRef.current.muted = true;
+                          toast.info("Ana audio isključen");
+                        }
+                      }
+                    }}
+                  >
+                    <Volume2 className="w-3 h-3" />
                   </Button>
                 </div>
               </div>
