@@ -702,13 +702,21 @@ export default function CreateAvatar() {
     if (selectedAvatarForCreation === null && !createdAvatarVideo) return;
     
     const avatar = avatars[avatars.length - 1]; // Latest created avatar
-    if (avatar) {
+    if (avatar && avatar.video) {
+      // Ensure the avatar has the video URL
+      const completeAvatar = {
+        ...avatar,
+        video: createdAvatarVideo || avatar.video
+      };
+      
       // Add avatar to live avatars in context
-      addAvatarToLive(avatar);
+      addAvatarToLive(completeAvatar);
       
       // Navigate to Podcast Live
       window.location.href = '/podcast-live';
-      toast.success("Avatar poslat u Podcast Live!");
+      toast.success(`Avatar ${avatar.name} poslat u Podcast Live sa videom!`);
+    } else {
+      toast.error("Avatar nema generisan video. Generiši video prvo!");
     }
   };
 

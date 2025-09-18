@@ -42,6 +42,9 @@ export default function PodcastLive() {
   // Get avatar context
   const { selectedAvatarsForLive, generatedScript, generatedVoice } = useAvatarContext();
   
+  // Auto-activate avatars when they exist
+  const [hasAutoActivated, setHasAutoActivated] = useState(false);
+  
   const [isLive, setIsLive] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [avatarsActive, setAvatarsActive] = useState(false);
@@ -114,6 +117,19 @@ export default function PodcastLive() {
         image: avatar.image
       }))
     : defaultAvatars.map(avatar => ({ ...avatar, image: null }));
+
+  // Auto-activate avatars when they're added
+  useEffect(() => {
+    if (selectedAvatarsForLive.length > 0 && !hasAutoActivated) {
+      setAvatarsActive(true);
+      setAvatar1CameraActive(true);
+      if (selectedAvatarsForLive.length > 1) {
+        setAvatar2CameraActive(true);
+      }
+      setHasAutoActivated(true);
+      toast.success(`${selectedAvatarsForLive.length} avatar(a) automatski aktiviran(o)!`);
+    }
+  }, [selectedAvatarsForLive.length, hasAutoActivated]);
 
   // AI Audio Analysis and Scene Control
   useEffect(() => {
