@@ -703,14 +703,14 @@ export default function PodcastLive() {
                 </div>
                 
                  <div className="grid grid-cols-3 gap-1">
-                  <Button
-                    size="sm"
-                    variant={avatar1VideoPlaying ? "default" : "outline"}
-                    className="glass-button"
-                    onClick={toggleAvatar1Video}
-                   >
-                     {avatar1VideoPlaying ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
-                   </Button>
+                   <Button
+                     size="sm"
+                     variant={avatar1VideoPlaying ? "default" : "outline"}
+                     className="glass-button"
+                     onClick={toggleAvatar1Video}
+                    >
+                      {avatar1VideoPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                    </Button>
                    <Button
                      size="sm"
                      variant="outline"
@@ -842,14 +842,14 @@ export default function PodcastLive() {
                 </div>
                 
                  <div className="grid grid-cols-3 gap-1">
-                  <Button
-                    size="sm"
-                    variant={avatar2VideoPlaying ? "default" : "outline"}
-                    className="glass-button"
-                    onClick={toggleAvatar2Video}
-                  >
-                    {avatar2VideoPlaying ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
-                  </Button>
+                   <Button
+                     size="sm"
+                     variant={avatar2VideoPlaying ? "default" : "outline"}
+                     className="glass-button"
+                     onClick={toggleAvatar2Video}
+                   >
+                     {avatar2VideoPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
