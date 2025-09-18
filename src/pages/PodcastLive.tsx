@@ -4,6 +4,7 @@ import { GlassCard, GlassCardContent, GlassCardHeader, GlassCardTitle } from "@/
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { useAvatarContext } from "@/contexts/AvatarContext";
 import { 
   Play, 
   Pause, 
@@ -38,6 +39,9 @@ import {
 import { toast } from "sonner";
 
 export default function PodcastLive() {
+  // Get avatar context
+  const { selectedAvatarsForLive, generatedScript, generatedVoice } = useAvatarContext();
+  
   const [isLive, setIsLive] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [avatarsActive, setAvatarsActive] = useState(false);
@@ -69,7 +73,8 @@ export default function PodcastLive() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
 
-  const avatars = [
+  // Dynamic avatars from context with fallback to default ones
+  const defaultAvatars = [
     {
       id: 1,
       name: "Marko",
@@ -78,7 +83,8 @@ export default function PodcastLive() {
       avatar: "male-avatar",
       voicePattern: "deep-professional",
       lastSpoke: 0,
-      speakingIntensity: 0
+      speakingIntensity: 0,
+      video: null
     },
     {
       id: 2,
@@ -88,9 +94,26 @@ export default function PodcastLive() {
       avatar: "female-avatar",
       voicePattern: "warm-friendly",
       lastSpoke: 0,
-      speakingIntensity: 0
+      speakingIntensity: 0,
+      video: null
     }
   ];
+
+  // Merge context avatars with default display properties
+  const avatars = selectedAvatarsForLive.length > 0 
+    ? selectedAvatarsForLive.map((avatar, index) => ({
+        id: index + 1,
+        name: avatar.name,
+        gender: avatar.gender,
+        isActive: index === 0 ? avatar1CameraActive : avatar2CameraActive,
+        avatar: avatar.gender === 'male' ? 'male-avatar' : 'female-avatar',
+        voicePattern: avatar.gender === 'male' ? 'deep-professional' : 'warm-friendly',
+        lastSpoke: 0,
+        speakingIntensity: 0,
+        video: avatar.video,
+        image: avatar.image
+      }))
+    : defaultAvatars.map(avatar => ({ ...avatar, image: null }));
 
   // AI Audio Analysis and Scene Control
   useEffect(() => {
@@ -520,11 +543,27 @@ export default function PodcastLive() {
               <div className="aspect-video bg-gradient-to-br from-secondary/10 to-accent/10 rounded-lg flex items-center justify-center relative border border-secondary/20">
                 {avatarsActive && avatar1CameraActive ? (
                   <div className="w-full h-full cyber-gradient-secondary rounded-lg flex items-center justify-center relative">
-                    <div className="text-center text-white">
-                      <Users className="w-8 h-8 mx-auto mb-2" />
-                      <p className="text-sm font-medium">Marko AI</p>
-                      <p className="text-xs opacity-80">Profesionalni Govornik</p>
-                    </div>
+                    {avatars[0]?.video ? (
+                      <video 
+                        src={avatars[0].video} 
+                        className="w-full h-full object-cover rounded-lg"
+                        autoPlay 
+                        loop 
+                        muted
+                      />
+                    ) : avatars[0]?.image ? (
+                      <img 
+                        src={avatars[0].image} 
+                        alt={avatars[0].name}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="text-center text-white">
+                        <Users className="w-8 h-8 mx-auto mb-2" />
+                        <p className="text-sm font-medium">{avatars[0]?.name || 'Avatar 1'}</p>
+                        <p className="text-xs opacity-80">Profesionalni Govornik</p>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-secondary/30 to-transparent rounded-lg"></div>
                   </div>
                 ) : (
@@ -620,11 +659,27 @@ export default function PodcastLive() {
               <div className="aspect-video bg-gradient-to-br from-accent/10 to-primary/10 rounded-lg flex items-center justify-center relative border border-accent/20">
                 {avatarsActive && avatar2CameraActive ? (
                   <div className="w-full h-full cyber-gradient-accent rounded-lg flex items-center justify-center relative">
-                    <div className="text-center text-white">
-                      <Users className="w-8 h-8 mx-auto mb-2" />
-                      <p className="text-sm font-medium">Ana AI</p>
-                      <p className="text-xs opacity-80">Prijateljski Govornik</p>
-                    </div>
+                    {avatars[1]?.video ? (
+                      <video 
+                        src={avatars[1].video} 
+                        className="w-full h-full object-cover rounded-lg"
+                        autoPlay 
+                        loop 
+                        muted
+                      />
+                    ) : avatars[1]?.image ? (
+                      <img 
+                        src={avatars[1].image} 
+                        alt={avatars[1].name}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="text-center text-white">
+                        <Users className="w-8 h-8 mx-auto mb-2" />
+                        <p className="text-sm font-medium">{avatars[1]?.name || 'Avatar 2'}</p>
+                        <p className="text-xs opacity-80">Prijateljski Govornik</p>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-accent/30 to-transparent rounded-lg"></div>
                   </div>
                 ) : (

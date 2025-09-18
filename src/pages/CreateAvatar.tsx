@@ -43,6 +43,7 @@ import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAvatarContext } from "@/contexts/AvatarContext";
 
 interface GeneratedAvatar {
   id: string;
@@ -66,19 +67,16 @@ export default function CreateAvatar() {
   const [concept, setConcept] = useState("");
   const [links, setLinks] = useState<string[]>([""]);
   const [duration, setDuration] = useState("");
-  const [avatars, setAvatars] = useState<GeneratedAvatar[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [audioStates, setAudioStates] = useState<AudioState>({});
   
   // Avatar customization states
-  const [avatarDescription, setAvatarDescription] = useState('');
   const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('male');
   const [avatarImage, setAvatarImage] = useState<File | null>(null);
   const [avatarImagePreview, setAvatarImagePreview] = useState<string | null>(null);
   
   // Script generation states
   const [scriptAvatarCount, setScriptAvatarCount] = useState("2");
-  const [generatedScript, setGeneratedScript] = useState("");
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [isEditingScript, setIsEditingScript] = useState(false);
   
@@ -508,14 +506,31 @@ export default function CreateAvatar() {
     }
   };
 
+  // Get context data
+  const {
+    generatedScript,
+    setGeneratedScript,
+    generatedVoice,
+    setGeneratedVoice,
+    voiceConfig,
+    setVoiceConfig,
+    createdAvatarVideo,
+    setCreatedAvatarVideo,
+    selectedAvatarImage,
+    setSelectedAvatarImage,
+    avatarDescription,
+    setAvatarDescription,
+    avatars,
+    addAvatar,
+    addAvatarToLive
+  } = useAvatarContext();
+
   const [selectedAvatarForCreation, setSelectedAvatarForCreation] = useState<number | null>(null);
   const [isCreatingVideo, setIsCreatingVideo] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
-  const [createdAvatarVideo, setCreatedAvatarVideo] = useState<string | null>(null);
   const [isDialogMinimized, setIsDialogMinimized] = useState(false);
-  
+
   // Image generation/upload states
-  const [selectedAvatarImage, setSelectedAvatarImage] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
   const [uploadedAvatarFile, setUploadedAvatarFile] = useState<File | null>(null);
@@ -648,7 +663,7 @@ export default function CreateAvatar() {
       const videoUrl = response.data?.videoUrl || response.data?.output?.url || null;
       console.log('Generated video URL:', videoUrl);
       
-      const newAvatar: GeneratedAvatar = {
+      const newAvatar = {
         id: `avatar-${selectedAvatarForCreation + 1}-${Date.now()}`,
         name: `Avatar ${selectedAvatarForCreation + 1}`,
         gender: selectedAvatarForCreation % 2 === 0 ? selectedGender : (selectedGender === 'male' ? 'female' : 'male'),
@@ -660,7 +675,7 @@ export default function CreateAvatar() {
       };
 
       setCreatedAvatarVideo(videoUrl);
-      setAvatars(prev => [...prev, newAvatar]);
+      addAvatar(newAvatar);
       toast.success("Avatar sa videom uspješno kreiran!");
 
     } catch (error) {
@@ -684,12 +699,12 @@ export default function CreateAvatar() {
   };
 
   const sendToPodcastLive = () => {
-    if (selectedAvatarForCreation === null) return;
+    if (selectedAvatarForCreation === null && !createdAvatarVideo) return;
     
     const avatar = avatars[avatars.length - 1]; // Latest created avatar
     if (avatar) {
-      // Store avatar data in localStorage for Podcast Live
-      localStorage.setItem('selectedAvatar', JSON.stringify(avatar));
+      // Add avatar to live avatars in context
+      addAvatarToLive(avatar);
       
       // Navigate to Podcast Live
       window.location.href = '/podcast-live';
@@ -700,10 +715,8 @@ export default function CreateAvatar() {
   const generateAvatars = async () => {
     setIsGenerating(true);
     try {
-      const newAvatars: GeneratedAvatar[] = [];
-      
       for (let i = 0; i < parseInt(scriptAvatarCount); i++) {
-        const avatar: GeneratedAvatar = {
+        const avatar = {
           id: `avatar-${i + 1}`,
           name: `Avatar ${i + 1}`,
           gender: i % 2 === 0 ? selectedGender : (selectedGender === 'male' ? 'female' : 'male'),
@@ -713,10 +726,8 @@ export default function CreateAvatar() {
           audio: null,
           description: avatarDescription || `Profesionalni ${i % 2 === 0 ? selectedGender === 'male' ? 'muški' : 'ženski' : selectedGender === 'male' ? 'ženski' : 'muški'} avatar za podcast`
         };
-        newAvatars.push(avatar);
+        addAvatar(avatar);
       }
-      
-      setAvatars(newAvatars);
       toast.success(`Uspješno generirani ${scriptAvatarCount} avatar(i)!`);
     } catch (error) {
       console.error('Error generating avatars:', error);
